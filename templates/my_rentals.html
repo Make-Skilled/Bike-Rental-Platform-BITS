@@ -3,185 +3,196 @@
 {% block title %}My Rentals{% endblock %}
 
 {% block content %}
-<div class="container">
-    <ul class="nav nav-tabs mb-4" id="rentalTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="my-rentals-tab" data-bs-toggle="tab" data-bs-target="#my-rentals" type="button">
-                My Rentals
-                {% if my_rentals %}
-                    <span class="badge bg-primary ms-2">{{ my_rentals|length }}</span>
-                {% endif %}
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="my-bikes-rentals-tab" data-bs-toggle="tab" data-bs-target="#my-bikes-rentals" type="button">
-                Rentals of My Bikes
-                {% if rentals_of_my_bikes %}
-                    <span class="badge bg-primary ms-2">{{ rentals_of_my_bikes|length }}</span>
-                {% endif %}
-            </button>
-        </li>
-    </ul>
-
-    <div class="tab-content" id="rentalTabsContent">
-        <!-- My Rentals -->
-        <div class="tab-pane fade show active" id="my-rentals" role="tabpanel">
-            <h3 class="mb-4">Bikes I've Rented</h3>
-            {% if my_rentals %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Bike</th>
-                                <th>Owner</th>
-                                <th>Rental Period</th>
-                                <th>Total Price</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for rental in my_rentals %}
-                                <tr>
-                                    <td>
-                                        <a href="{{ url_for('view_bike', bike_id=rental.bike.id) }}" class="text-decoration-none">
-                                            {{ rental.bike.name }}
-                                        </a>
-                                        <div class="text-muted small">{{ rental.bike.model }} ({{ rental.bike.year }})</div>
-                                    </td>
-                                    <td>
-                                        {{ rental.bike.owner.username }}
-                                        <div class="text-muted small">{{ rental.bike.owner.email }}</div>
-                                    </td>
-                                    <td>
-                                        {{ rental.start_date.strftime('%Y-%m-%d') }} to {{ rental.end_date.strftime('%Y-%m-%d') }}
-                                        <div class="text-muted small">{{ (rental.end_date - rental.start_date).days }} days</div>
-                                    </td>
-                                    <td>${{ "%.2f"|format(rental.total_price) }}</td>
-                                    <td>
-                                        <span class="badge {% if rental.status == 'active' %}bg-success
-                                                       {% elif rental.status == 'pending' %}bg-warning
-                                                       {% elif rental.status == 'completed' %}bg-info
-                                                       {% else %}bg-secondary{% endif %}">
-                                            {{ rental.status.title() }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if rental.status == 'pending' %}
-                                            <button class="btn btn-sm btn-success me-1" onclick="updateRentalStatus({{ rental.id }}, 'active')">
-                                                <i class="fas fa-check me-1"></i>Start
-                                            </button>
-                                            <button class="btn btn-sm btn-danger" onclick="updateRentalStatus({{ rental.id }}, 'cancelled')">
-                                                <i class="fas fa-times me-1"></i>Cancel
-                                            </button>
-                                        {% elif rental.status == 'active' %}
-                                            <button class="btn btn-sm btn-info" onclick="updateRentalStatus({{ rental.id }}, 'completed')">
-                                                <i class="fas fa-flag-checkered me-1"></i>Complete
-                                            </button>
-                                        {% endif %}
-                                    </td>
-                                </tr>
+<div class="container py-4">
+    <!-- Rentals as Renter -->
+    <div class="mb-5">
+        <h2 class="h3 mb-4">My Rented Bikes</h2>
+        {% if my_rentals %}
+            <div class="row g-4">
+                {% for rental in my_rentals %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100">
+                            <!-- Bike Image -->
+                            {% if rental.bike.image_url_1 %}
+                                <img src="{{ url_for('static', filename=rental.bike.image_url_1) }}" 
+                                     class="card-img-top" alt="{{ rental.bike.name }}"
+                                     style="height: 200px; object-fit: cover;">
                             {% else %}
-                                <tr>
-                                    <td colspan="6" class="text-center">No rentals found.</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>You haven't rented any bikes yet.
-                    <a href="{{ url_for('index') }}" class="alert-link">Browse available bikes!</a>
-                </div>
-            {% endif %}
-        </div>
+                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                                     style="height: 200px;">
+                                    <i class="fas fa-bicycle fa-3x text-muted"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="card-title mb-0">{{ rental.bike.name }}</h5>
+                                    <span class="badge {% if rental.status == 'active' %}bg-success{% elif rental.status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ rental.status|title }}
+                                    </span>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-bicycle me-2"></i>{{ rental.bike.model }} ({{ rental.bike.year }})
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-user me-2"></i>Owner: {{ rental.bike.owner.username }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-envelope me-2"></i>Email: {{ rental.bike.owner.email }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-phone me-2"></i>Mobile: {{ rental.bike.owner.mobile or 'Not provided' }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-calendar me-2"></i>From: {{ rental.start_date.strftime('%Y-%m-%d') }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-calendar-check me-2"></i>To: {{ rental.end_date.strftime('%Y-%m-%d') }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-tag me-2"></i>Total: ${{ "%.2f"|format(rental.total_price) }}
+                                    </p>
+                                </div>
 
-        <!-- Rentals of My Bikes -->
-        <div class="tab-pane fade" id="my-bikes-rentals" role="tabpanel">
-            <h3 class="mb-4">Rentals of My Bikes</h3>
-            {% if rentals_of_my_bikes %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Bike</th>
-                                <th>Renter</th>
-                                <th>Rental Period</th>
-                                <th>Total Price</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for rental in rentals_of_my_bikes %}
-                                <tr>
-                                    <td>
-                                        <a href="{{ url_for('view_bike', bike_id=rental.bike.id) }}" class="text-decoration-none">
-                                            {{ rental.bike.name }}
-                                        </a>
-                                        <div class="text-muted small">{{ rental.bike.model }} ({{ rental.bike.year }})</div>
-                                    </td>
-                                    <td>
-                                        {{ rental.renter.username }}
-                                        <div class="text-muted small">{{ rental.renter.email }}</div>
-                                    </td>
-                                    <td>
-                                        {{ rental.start_date.strftime('%Y-%m-%d') }} to {{ rental.end_date.strftime('%Y-%m-%d') }}
-                                        <div class="text-muted small">{{ (rental.end_date - rental.start_date).days }} days</div>
-                                    </td>
-                                    <td>${{ "%.2f"|format(rental.total_price) }}</td>
-                                    <td>
-                                        <span class="badge {% if rental.status == 'active' %}bg-success
-                                                       {% elif rental.status == 'pending' %}bg-warning
-                                                       {% elif rental.status == 'completed' %}bg-info
-                                                       {% else %}bg-secondary{% endif %}">
-                                            {{ rental.status.title() }}
-                                        </span>
-                                    </td>
-                                </tr>
+                                <div class="d-grid">
+                                    <a href="{{ url_for('view_bike', bike_id=rental.bike.id) }}" 
+                                       class="btn btn-outline-primary">
+                                        <i class="fas fa-info-circle me-2"></i>View Bike Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-bicycle fa-3x text-muted mb-3"></i>
+                    <h3>No Rentals Yet</h3>
+                    <p class="text-muted mb-4">You haven't rented any bikes yet.</p>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Browse Available Bikes
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Rentals as Owner -->
+    <div class="mb-5">
+        <h2 class="h3 mb-4">Rentals of My Bikes</h2>
+        {% if rentals_of_my_bikes %}
+            <div class="row g-4">
+                {% for rental in rentals_of_my_bikes %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100">
+                            <!-- Bike Image -->
+                            {% if rental.bike.image_url_1 %}
+                                <img src="{{ url_for('static', filename=rental.bike.image_url_1) }}" 
+                                     class="card-img-top" alt="{{ rental.bike.name }}"
+                                     style="height: 200px; object-fit: cover;">
                             {% else %}
-                                <tr>
-                                    <td colspan="5" class="text-center">None of your bikes have been rented yet.</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                                     style="height: 200px;">
+                                    <i class="fas fa-bicycle fa-3x text-muted"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="card-title mb-0">{{ rental.bike.name }}</h5>
+                                    <span class="badge {% if rental.status == 'active' %}bg-success{% elif rental.status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ rental.status|title }}
+                                    </span>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-bicycle me-2"></i>{{ rental.bike.model }} ({{ rental.bike.year }})
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-user me-2"></i>Renter: {{ rental.renter.username }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-envelope me-2"></i>Email: {{ rental.renter.email }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-phone me-2"></i>Mobile: {{ rental.renter.mobile or 'Not provided' }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-calendar me-2"></i>From: {{ rental.start_date.strftime('%Y-%m-%d') }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-calendar-check me-2"></i>To: {{ rental.end_date.strftime('%Y-%m-%d') }}
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-tag me-2"></i>Total: ${{ "%.2f"|format(rental.total_price) }}
+                                    </p>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('view_bike', bike_id=rental.bike.id) }}" 
+                                       class="btn btn-outline-primary">
+                                        <i class="fas fa-info-circle me-2"></i>View Bike Details
+                                    </a>
+                                    {% if rental.status == 'active' %}
+                                        <button type="button" class="btn btn-success" 
+                                                onclick="markRentalComplete({{ rental.id }})">
+                                            <i class="fas fa-check me-2"></i>Mark as Complete
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-bicycle fa-3x text-muted mb-3"></i>
+                    <h3>No Rentals Yet</h3>
+                    <p class="text-muted mb-4">None of your bikes are currently rented.</p>
+                    <a href="{{ url_for('add_bike') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add a Bike
+                    </a>
                 </div>
-            {% else %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>None of your bikes have been rented yet.
-                </div>
-            {% endif %}
-        </div>
+            </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Enable tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
-
-    // Handle rental status updates
-    function updateRentalStatus(rentalId, newStatus) {
-        if (confirm(`Are you sure you want to update this rental status to ${newStatus}?`)) {
-            fetch(`/rentals/${rentalId}/status`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ status: newStatus })
-            }).then(response => {
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    alert('Failed to update rental status. Please try again.');
-                }
-            });
-        }
+function markRentalComplete(rentalId) {
+    if (confirm('Are you sure you want to mark this rental as complete?')) {
+        fetch(`/rentals/${rentalId}/complete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json().then(data => ({
+            ok: response.ok,
+            status: response.status,
+            data: data
+        })))
+        .then(({ ok, status, data }) => {
+            if (!ok) {
+                throw new Error(data.error || 'Failed to update rental status');
+            }
+            alert('Rental marked as complete successfully!');
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(error.message || 'Failed to update rental status. Please try again.');
+        });
     }
+}
 </script>
 {% endblock %}
