@@ -29,7 +29,7 @@
             <h3 class="mb-4">Requests for Your Bikes</h3>
             {% if received_requests %}
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover table-striped shadow-sm">
                         <thead class="table-light">
                             <tr>
                                 <th>Request ID</th>
@@ -52,8 +52,8 @@
                                         <div class="text-muted small">{{ request.bike.model }} ({{ request.bike.year }})</div>
                                     </td>
                                     <td>
-                                        {{ request.requester.username }}
-                                        <div class="text-muted small">{{ request.requester.email }}</div>
+                                        {{ request.renter.username }}
+                                        <div class="text-muted small">{{ request.renter.email }}</div>
                                     </td>
                                     <td>
                                         {{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}
@@ -70,9 +70,9 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge {% if request.status == 'pending' %}bg-warning
-                                                       {% elif request.status == 'approved' %}bg-success
-                                                       {% else %}bg-danger{% endif %}">
+                                        <span class="badge {% if request.status == 'pending' %}badge-warning
+                                                       {% elif request.status == 'approved' %}badge-success
+                                                       {% else %}badge-danger{% endif %}">
                                             {{ request.status.title() }}
                                         </span>
                                     </td>
@@ -105,7 +105,7 @@
             <h3 class="mb-4">Your Rental Requests</h3>
             {% if sent_requests %}
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover table-striped shadow-sm">
                         <thead class="table-light">
                             <tr>
                                 <th>Request ID</th>
@@ -127,8 +127,8 @@
                                         <div class="text-muted small">{{ request.bike.model }} ({{ request.bike.year }})</div>
                                     </td>
                                     <td>
-                                        {{ request.bike.owner.username }}
-                                        <div class="text-muted small">{{ request.bike.owner.email }}</div>
+                                        {{ request.bike.owner_user.username }}
+                                        <div class="text-muted small">{{ request.bike.owner_user.email }}</div>
                                     </td>
                                     <td>
                                         {{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}
@@ -136,9 +136,9 @@
                                     </td>
                                     <td>${{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</td>
                                     <td>
-                                        <span class="badge {% if request.status == 'pending' %}bg-warning
-                                                       {% elif request.status == 'approved' %}bg-success
-                                                       {% else %}bg-danger{% endif %}">
+                                        <span class="badge {% if request.status == 'pending' %}badge-warning
+                                                       {% elif request.status == 'approved' %}badge-success
+                                                       {% else %}badge-danger{% endif %}">
                                             {{ request.status.title() }}
                                         </span>
                                     </td>
@@ -156,14 +156,15 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block scripts %}
 <script>
     // Enable tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 
     // Handle request approval/rejection
     function handleRequest(requestId, action) {
@@ -189,5 +190,4 @@
         });
     }
 </script>
-{% endblock %}
 {% endblock %}

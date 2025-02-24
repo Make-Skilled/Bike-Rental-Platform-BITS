@@ -5,159 +5,80 @@
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 mb-0">My Bikes</h1>
+        <h2>My Bikes</h2>
         <a href="{{ url_for('add_bike') }}" class="btn btn-primary">
             <i class="fas fa-plus me-2"></i>Add New Bike
         </a>
     </div>
 
     {% if bikes %}
-        <div class="row g-4">
-            {% for bike in bikes %}
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100">
-                        <!-- Bike Images Carousel -->
-                        {% if bike.image_url_1 or bike.image_url_2 or bike.image_url_3 %}
-                            <div id="bikeCarousel{{ bike.id }}" class="carousel slide" data-bs-ride="carousel">
-                                <div class="carousel-inner">
-                                    {% if bike.image_url_1 %}
-                                        <div class="carousel-item active">
-                                            <img src="{{ url_for('static', filename=bike.image_url_1) }}" 
-                                                 class="d-block w-100" alt="{{ bike.name }}"
-                                                 style="height: 200px; object-fit: cover;">
-                                        </div>
-                                    {% endif %}
-                                    {% if bike.image_url_2 %}
-                                        <div class="carousel-item">
-                                            <img src="{{ url_for('static', filename=bike.image_url_2) }}" 
-                                                 class="d-block w-100" alt="{{ bike.name }}"
-                                                 style="height: 200px; object-fit: cover;">
-                                        </div>
-                                    {% endif %}
-                                    {% if bike.image_url_3 %}
-                                        <div class="carousel-item">
-                                            <img src="{{ url_for('static', filename=bike.image_url_3) }}" 
-                                                 class="d-block w-100" alt="{{ bike.name }}"
-                                                 style="height: 200px; object-fit: cover;">
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                {% if (bike.image_url_1 and bike.image_url_2) or (bike.image_url_1 and bike.image_url_3) or (bike.image_url_2 and bike.image_url_3) %}
-                                    <button class="carousel-control-prev" type="button" 
-                                            data-bs-target="#bikeCarousel{{ bike.id }}" data-bs-slide="prev">
-                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                        <span class="visually-hidden">Previous</span>
-                                    </button>
-                                    <button class="carousel-control-next" type="button" 
-                                            data-bs-target="#bikeCarousel{{ bike.id }}" data-bs-slide="next">
-                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                        <span class="visually-hidden">Next</span>
-                                    </button>
-                                {% endif %}
-                            </div>
-                        {% else %}
-                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
-                                 style="height: 200px;">
-                                <i class="fas fa-bicycle fa-3x text-muted"></i>
-                            </div>
-                        {% endif %}
-
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <h5 class="card-title mb-0">{{ bike.name }}</h5>
-                                <span class="badge {% if bike.is_available %}bg-success{% else %}bg-danger{% endif %}">
-                                    {{ 'Available' if bike.is_available else 'Not Available' }}
-                                </span>
-                            </div>
-
-                            <div class="mb-3">
-                                <p class="text-muted mb-1">
-                                    <i class="fas fa-bicycle me-2"></i>{{ bike.model }} ({{ bike.year }})
-                                </p>
-                                <p class="text-muted mb-1">
-                                    <i class="fas fa-star me-2"></i>Condition: {{ bike.condition }}
-                                </p>
-                                <p class="text-muted mb-1">
-                                    <i class="fas fa-tag me-2"></i>Price: ${{ "%.2f"|format(bike.price_per_day) }}/day
-                                </p>
-                                <p class="text-muted mb-1">
-                                    <i class="fas fa-clock me-2"></i>Listed: {{ bike.created_at.strftime('%Y-%m-%d') }}
-                                </p>
-                            </div>
-
-                            <!-- Active Rentals Section -->
-                            {% set active_rentals = bike.rentals|selectattr('status', 'equalto', 'active')|list %}
-                            {% if active_rentals %}
-                                <div class="mb-3">
-                                    <h6 class="text-muted mb-2">Current Rental</h6>
-                                    {% for rental in active_rentals %}
-                                        <div class="small">
-                                            <p class="mb-1">
-                                                <i class="fas fa-user me-1"></i>Rented by: {{ rental.renter.username }}
-                                            </p>
-                                            <p class="mb-1">
-                                                <i class="fas fa-calendar me-1"></i>Until: {{ rental.end_date.strftime('%Y-%m-%d') }}
-                                            </p>
-                                        </div>
-                                    {% endfor %}
-                                </div>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for bike in bikes %}
+        <div class="col">
+            <div class="card h-100">
+                {% if bike.image_url_1 %}
+                <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" 
+                     class="card-img-top" alt="{{ bike.name }}" style="height: 200px; object-fit: cover;">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ bike.name }}</h5>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            <i class="fas fa-bicycle me-2"></i>{{ bike.model }} ({{ bike.year }})
+                        </small>
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            <i class="fas fa-tag me-2"></i>
+                            {% if bike.listing_type == 'rent' %}
+                                For Rent: ${{ "%.2f"|format(bike.price_per_day) }}/day
+                            {% else %}
+                                For Sale: ${{ "%.2f"|format(bike.sale_price) }}
                             {% endif %}
-
-                            <div class="d-grid gap-2">
-                                <a href="{{ url_for('edit_bike', bike_id=bike.id) }}" 
-                                   class="btn btn-outline-primary">
-                                    <i class="fas fa-edit me-2"></i>Edit Details
-                                </a>
-                                <button type="button" class="btn btn-outline-danger"
-                                        onclick="deleteBike({{ bike.id }})">
-                                    <i class="fas fa-trash me-2"></i>Delete Bike
-                                </button>
-                            </div>
-                        </div>
+                        </small>
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            <i class="fas fa-check-circle me-2"></i>Status: 
+                            {% if bike.is_available %}
+                                <span class="text-success">Available</span>
+                            {% else %}
+                                <span class="text-danger">Not Available</span>
+                            {% endif %}
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <div class="btn-group w-100">
+                        <a href="{{ url_for('view_bike', bike_id=bike.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-eye me-2"></i>View
+                        </a>
+                        <a href="{{ url_for('edit_bike', bike_id=bike.id) }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-edit me-2"></i>Edit
+                        </a>
                     </div>
                 </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="card">
-            <div class="card-body text-center py-5">
-                <i class="fas fa-bicycle fa-3x text-muted mb-3"></i>
-                <h3>No Bikes Listed</h3>
-                <p class="text-muted mb-4">You haven't listed any bikes for rent yet.</p>
-                <a href="{{ url_for('add_bike') }}" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Add Your First Bike
-                </a>
             </div>
         </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>You haven't listed any bikes yet. 
+        <a href="{{ url_for('add_bike') }}" class="alert-link">Add your first bike!</a>
+    </div>
     {% endif %}
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-function deleteBike(bikeId) {
-    if (confirm('Are you sure you want to delete this bike? This action cannot be undone.')) {
-        fetch(`/bikes/${bikeId}/delete`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to delete bike');
-            }
-            return response.json();
-        })
-        .then(data => {
-            alert('Bike deleted successfully!');
-            location.reload();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to delete bike. Please try again.');
-        });
-    }
+{% block styles %}
+<style>
+.card-img-top {
+    height: 200px;
+    object-fit: cover;
 }
-</script>
+</style>
+{% endblock %}
+
+{% block scripts %}
 {% endblock %}

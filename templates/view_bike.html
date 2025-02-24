@@ -8,39 +8,33 @@
         <!-- Bike Images -->
         <div class="col-md-6 mb-4">
             {% if bike.image_url_1 or bike.image_url_2 or bike.image_url_3 %}
-                <div id="bikeImageCarousel" class="carousel slide" data-bs-ride="carousel">
+                <div id="bikeCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
                     <div class="carousel-inner">
                         {% if bike.image_url_1 %}
                             <div class="carousel-item active">
-                                <img src="{{ url_for('static', filename=bike.image_url_1) }}" 
-                                     class="d-block w-100 rounded" 
-                                     alt="{{ bike.name }}"
-                                     style="height: 400px; object-fit: cover;">
+                                <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" 
+                                     class="d-block w-100 rounded" alt="{{ bike.name }}">
                             </div>
                         {% endif %}
                         {% if bike.image_url_2 %}
                             <div class="carousel-item">
-                                <img src="{{ url_for('static', filename=bike.image_url_2) }}" 
-                                     class="d-block w-100 rounded" 
-                                     alt="{{ bike.name }}"
-                                     style="height: 400px; object-fit: cover;">
+                                <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_2) }}" 
+                                     class="d-block w-100 rounded" alt="{{ bike.name }}">
                             </div>
                         {% endif %}
                         {% if bike.image_url_3 %}
                             <div class="carousel-item">
-                                <img src="{{ url_for('static', filename=bike.image_url_3) }}" 
-                                     class="d-block w-100 rounded" 
-                                     alt="{{ bike.name }}"
-                                     style="height: 400px; object-fit: cover;">
+                                <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_3) }}" 
+                                     class="d-block w-100 rounded" alt="{{ bike.name }}">
                             </div>
                         {% endif %}
                     </div>
-                    {% if (bike.image_url_1 and bike.image_url_2) or (bike.image_url_1 and bike.image_url_3) or (bike.image_url_2 and bike.image_url_3) %}
-                        <button class="carousel-control-prev" type="button" data-bs-target="#bikeImageCarousel" data-bs-slide="prev">
+                    {% if bike.image_url_2 or bike.image_url_3 %}
+                        <button class="carousel-control-prev" type="button" data-bs-target="#bikeCarousel" data-bs-slide="prev">
                             <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                             <span class="visually-hidden">Previous</span>
                         </button>
-                        <button class="carousel-control-next" type="button" data-bs-target="#bikeImageCarousel" data-bs-slide="next">
+                        <button class="carousel-control-next" type="button" data-bs-target="#bikeCarousel" data-bs-slide="next">
                             <span class="carousel-control-next-icon" aria-hidden="true"></span>
                             <span class="visually-hidden">Next</span>
                         </button>
@@ -60,137 +54,190 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <h1 class="card-title h2">{{ bike.name }}</h1>
-                        <span class="badge {% if bike.is_available %}badge-success{% else %}badge-danger{% endif %} fs-6">
-                            {{ 'Available' if bike.is_available else 'Not Available' }}
+                        <span class="badge {% if bike.listing_type == 'rent' %}bg-primary{% else %}bg-success{% endif %}">
+                            {% if bike.listing_type == 'rent' %}For Rent{% else %}For Sale{% endif %}
                         </span>
                     </div>
 
                     <div class="mb-4">
-                        <h5 class="text-muted">About this bike</h5>
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <i class="fas fa-bicycle me-2"></i>
-                                <strong>Model:</strong> {{ bike.model }}
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-calendar me-2"></i>
-                                <strong>Year:</strong> {{ bike.year }}
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-star me-2"></i>
-                                <strong>Condition:</strong> {{ bike.condition }}
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-tag me-2"></i>
-                                <strong>Price:</strong> ${{ "%.2f"|format(bike.price_per_day) }} per day
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-user me-2"></i>
-                                <strong>Owner:</strong> {{ bike.owner.username }}
-                            </li>
-                        </ul>
+                        <p class="card-text text-muted mb-2">
+                            <i class="fas fa-bicycle me-2"></i>{{ bike.model }} ({{ bike.year }})
+                        </p>
+                        <p class="card-text text-muted mb-2">
+                            <i class="fas fa-star me-2"></i>Condition: {{ bike.condition }}
+                        </p>
+                        <p class="card-text text-muted mb-2">
+                            <i class="fas fa-user me-2"></i>Owner: {{ bike.owner_user.username }}
+                        </p>
+                        <p class="card-text text-muted mb-2">
+                            <i class="fas fa-phone me-2"></i>Contact: {{ bike.owner_user.mobile if bike.owner_user.mobile else 'Not provided' }}
+                        </p>
+                        {% if bike.listing_type == 'rent' %}
+                        <p class="card-text text-muted mb-2">
+                            <i class="fas fa-tag me-2"></i>Price: ${{ "%.2f"|format(bike.price_per_day or 0) }} per day
+                        </p>
+                        {% else %}
+                        <p class="card-text text-muted mb-2">
+                            <i class="fas fa-tag me-2"></i>Price: ${{ "%.2f"|format(bike.sale_price or 0) }}
+                        </p>
+                        {% endif %}
                     </div>
 
                     <div class="mb-4">
-                        <h5 class="text-muted">Description</h5>
+                        <h5 class="mb-3">Description</h5>
                         <p class="card-text">{{ bike.description }}</p>
                     </div>
 
+                    <!-- Rental Status -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">Rental Status</h5>
+                        {% if not bike.is_available %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-circle me-2"></i>This bike is currently not available for rent
+                            </div>
+                        {% endif %}
+
+                        {% if active_rentals %}
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading">Current/Upcoming Rentals:</h6>
+                                <ul class="list-unstyled mb-0">
+                                    {% for rental in active_rentals %}
+                                        <li class="mb-2">
+                                            {% if bike.owner_id == session.get('user_id') %}
+                                                <!-- Show full details to bike owner -->
+                                                <strong>{{ rental.renter.username }}</strong><br>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar me-2"></i>{{ rental.start_date.strftime('%Y-%m-%d') }} to {{ rental.end_date.strftime('%Y-%m-%d') }}<br>
+                                                    <i class="fas fa-envelope me-2"></i>{{ rental.renter.email }}<br>
+                                                    <i class="fas fa-phone me-2"></i>{{ rental.renter.mobile if rental.renter.mobile else 'Not provided' }}
+                                                </small>
+                                            {% else %}
+                                                <!-- Show limited details to others -->
+                                                <i class="fas fa-calendar me-2"></i>
+                                                {{ rental.start_date.strftime('%Y-%m-%d') }} to {{ rental.end_date.strftime('%Y-%m-%d') }}
+                                                {% if rental.renter_id == session.get('user_id') %}
+                                                    <span class="badge bg-primary ms-2">Your Rental</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% else %}
+                            <p class="text-success mb-0">
+                                <i class="fas fa-check-circle me-2"></i>No active rentals - This bike is available!
+                            </p>
+                        {% endif %}
+
+                        {% if pending_requests and bike.owner_id == session.get('user_id') %}
+                            <div class="alert alert-warning mt-3">
+                                <h6 class="alert-heading">Pending Rental Requests:</h6>
+                                <ul class="list-unstyled mb-0">
+                                    {% for request in pending_requests %}
+                                        <li class="mb-2">
+                                            <strong><i class="fas fa-user me-2"></i>{{ request.renter.username }}</strong>
+                                            <br>
+                                            <small class="text-muted">
+                                                <i class="fas fa-calendar me-2"></i>{{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}<br>
+                                                <i class="fas fa-envelope me-2"></i>{{ request.renter.email }}<br>
+                                                <i class="fas fa-phone me-2"></i>{{ request.renter.mobile if request.renter.mobile else 'Not provided' }}
+                                                {% if request.message %}
+                                                    <br><i class="fas fa-comment me-2"></i>{{ request.message }}
+                                                {% endif %}
+                                            </small>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </div>
+
                     {% if session.get('user_id') and session.get('user_id') != bike.owner_id %}
-                        <div class="d-grid gap-2">
-                            {% if bike.is_available %}
-                                <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#rentalModal">
-                                    <i class="fas fa-calendar-plus me-2"></i>Request Rental
-                                </button>
+                        {% if bike.is_available %}
+                            {% if bike.listing_type == 'rent' %}
+                            <form method="POST" action="{{ url_for('request_rental', bike_id=bike.id) }}" class="mb-3">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="start_date" class="form-label">Start Date</label>
+                                        <input type="date" class="form-control" id="start_date" name="start_date" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="end_date" class="form-label">End Date</label>
+                                        <input type="date" class="form-control" id="end_date" name="end_date" required>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button type="submit" class="btn btn-primary">Request to Rent</button>
+                                </div>
+                            </form>
                             {% else %}
-                                <button class="btn btn-secondary btn-lg" disabled>
-                                    <i class="fas fa-ban me-2"></i>Currently Not Available
+                            <form method="POST" action="{{ url_for('request_purchase', bike_id=bike.id) }}" class="mb-3">
+                                <div class="mb-3">
+                                    <label for="message" class="form-label">Message to Owner (Optional)</label>
+                                    <textarea class="form-control" id="message" name="message" rows="3" 
+                                              placeholder="Introduce yourself and suggest a meeting time and place..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-handshake me-2"></i>Request to Purchase
                                 </button>
+                            </form>
                             {% endif %}
-                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>Back to Listings
-                            </a>
-                        </div>
-                    {% elif not session.get('user_id') %}
-                        <div class="d-grid gap-2">
-                            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
-                                <i class="fas fa-sign-in-alt me-2"></i>Login to Request Rental
-                            </a>
-                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>Back to Listings
-                            </a>
-                        </div>
-                    {% else %}
-                        <div class="d-grid">
-                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>Back to Listings
-                            </a>
-                        </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                This bike is currently not available.
+                            </div>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- Rental Request Modal -->
-{% if session.get('user_id') and session.get('user_id') != bike.owner_id %}
-    <div class="modal fade" id="rentalModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Request Rental</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="{{ url_for('request_rental', bike_id=bike.id) }}" method="POST">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="start_date" class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="start_date" name="start_date" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="end_date" class="form-label">End Date</label>
-                            <input type="date" class="form-control" id="end_date" name="end_date" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="message" class="form-label">Message to Owner (Optional)</label>
-                            <textarea class="form-control" id="message" name="message" rows="3" 
-                                      placeholder="Any special requests or questions?"></textarea>
-                        </div>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Price: ${{ "%.2f"|format(bike.price_per_day) }} per day
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Submit Request</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-{% endif %}
+{% block styles %}
+<style>
+.carousel-item img {
+    height: 400px;
+    object-fit: cover;
+}
+.carousel-control-prev,
+.carousel-control-next {
+    width: 10%;
+    background: rgba(0,0,0,0.2);
+}
+.carousel-control-prev:hover,
+.carousel-control-next:hover {
+    background: rgba(0,0,0,0.3);
+}
+.carousel-item img {
+    height: 400px;
+    object-fit: cover;
+}
+.carousel-control-prev,
+.carousel-control-next {
+    width: 10%;
+    background: rgba(0,0,0,0.2);
+}
+.carousel-control-prev:hover,
+.carousel-control-next:hover {
+    background: rgba(0,0,0,0.3);
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize date inputs with today's date as minimum
+    // Set minimum date for rental form
     const today = new Date().toISOString().split('T')[0];
-    const startDateInput = document.getElementById('start_date');
-    const endDateInput = document.getElementById('end_date');
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
     
-    if (startDateInput && endDateInput) {
-        startDateInput.min = today;
-        endDateInput.min = today;
-        
-        // Update end date minimum when start date changes
-        startDateInput.addEventListener('change', function() {
-            endDateInput.min = this.value;
-            if (endDateInput.value && endDateInput.value < this.value) {
-                endDateInput.value = this.value;
-            }
+    if (startDate && endDate) {
+        startDate.min = today;
+        startDate.addEventListener('change', function() {
+            endDate.min = this.value;
         });
     }
 });

@@ -1,140 +1,122 @@
 {% extends "base.html" %}
 
-{% block title %}Add New Bike{% endblock %}
+{% block title %}Add Bike{% endblock %}
 
 {% block content %}
 <div class="container py-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h1 class="h3 mb-0">Add New Bike</h1>
-                </div>
                 <div class="card-body">
-                    <form method="POST" class="needs-validation" enctype="multipart/form-data" novalidate>
-                        <!-- Name -->
-                        <div class="mb-4">
-                            <label for="name" class="form-label">Bike Name</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-bicycle"></i>
-                                </span>
-                                <input type="text" class="form-control" id="name" name="name" 
-                                       placeholder="e.g., Mountain Explorer 2000" required>
+                    <h2 class="card-title text-center mb-4">Add New Bike</h2>
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label">Bike Name</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
                             </div>
-                            <div class="form-text">Choose a descriptive name for your bike</div>
-                        </div>
-
-                        <!-- Model -->
-                        <div class="mb-4">
-                            <label for="model" class="form-label">Model</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-info-circle"></i>
-                                </span>
-                                <input type="text" class="form-control" id="model" name="model" 
-                                       placeholder="e.g., Trek Marlin 7" required>
+                            <div class="col-md-6">
+                                <label for="model" class="form-label">Model</label>
+                                <input type="text" class="form-control" id="model" name="model" required>
                             </div>
                         </div>
 
-                        <!-- Year -->
-                        <div class="mb-4">
-                            <label for="year" class="form-label">Year</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-calendar"></i>
-                                </span>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="year" class="form-label">Year</label>
                                 <input type="number" class="form-control" id="year" name="year" 
-                                       min="1900" max="{{ current_year }}" required>
+                                       min="1900" max="2025" required>
                             </div>
-                        </div>
-
-                        <!-- Condition -->
-                        <div class="mb-4">
-                            <label for="condition" class="form-label">Condition</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-star"></i>
-                                </span>
+                            <div class="col-md-6">
+                                <label for="condition" class="form-label">Condition</label>
                                 <select class="form-select" id="condition" name="condition" required>
                                     <option value="">Select condition...</option>
                                     <option value="Excellent">Excellent</option>
                                     <option value="Good">Good</option>
                                     <option value="Fair">Fair</option>
-                                    <option value="Needs Repair">Needs Repair</option>
+                                    <option value="Poor">Poor</option>
                                 </select>
                             </div>
                         </div>
 
-                        <!-- Price per day -->
-                        <div class="mb-4">
-                            <label for="price_per_day" class="form-label">Price per Day</label>
+                        <div class="mb-3">
+                            <label class="form-label">Listing Type</label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="listing_type" 
+                                           id="typeRent" value="rent" checked onchange="updatePriceFields()">
+                                    <label class="form-check-label" for="typeRent">
+                                        For Rent
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="listing_type" 
+                                           id="typeSale" value="sale" onchange="updatePriceFields()">
+                                    <label class="form-check-label" for="typeSale">
+                                        For Sale
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="rentalPriceField" class="mb-3">
+                            <label for="price_per_day" class="form-label">Rental Price (per day)</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="price_per_day" 
                                        name="price_per_day" step="0.01" min="0" required>
                             </div>
-                            <div class="form-text">Set a competitive daily rental rate</div>
                         </div>
 
-                        <!-- Description -->
-                        <div class="mb-4">
+                        <div id="salePriceField" class="mb-3" style="display: none;">
+                            <label for="sale_price" class="form-label">Sale Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="sale_price" 
+                                       name="sale_price" step="0.01" min="0">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
                             <textarea class="form-control" id="description" name="description" 
-                                      rows="4" placeholder="Describe your bike's features, history, and any special notes for renters" required></textarea>
+                                    rows="4" required></textarea>
                         </div>
 
-                        <!-- Images -->
-                        <div class="mb-4">
-                            <label class="form-label">Bike Images</label>
+                        <div class="mb-3">
+                            <label class="form-label">Images (Max 3)</label>
                             <div class="row g-3">
                                 <div class="col-md-4">
-                                    <div class="image-upload">
-                                        <div class="image-preview mb-2" id="preview1">
-                                            <img src="" class="img-fluid rounded d-none">
-                                        </div>
-                                        <div class="input-group">
-                                            <input type="file" class="form-control" id="image1" name="image1" 
-                                                   accept="image/*" required onchange="previewImage(this, 'preview1')">
-                                        </div>
-                                        <div class="form-text">Main image (required)</div>
+                                    <div class="image-upload-container">
+                                        <input type="file" class="form-control" id="image1" name="image1" 
+                                               accept="image/*" onchange="previewImage(this, 'preview1')">
+                                        <img id="preview1" class="img-preview mt-2 d-none" 
+                                             src="#" alt="Preview">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="image-upload">
-                                        <div class="image-preview mb-2" id="preview2">
-                                            <img src="" class="img-fluid rounded d-none">
-                                        </div>
-                                        <div class="input-group">
-                                            <input type="file" class="form-control" id="image2" name="image2" 
-                                                   accept="image/*" onchange="previewImage(this, 'preview2')">
-                                        </div>
-                                        <div class="form-text">Additional image (optional)</div>
+                                    <div class="image-upload-container">
+                                        <input type="file" class="form-control" id="image2" name="image2" 
+                                               accept="image/*" onchange="previewImage(this, 'preview2')">
+                                        <img id="preview2" class="img-preview mt-2 d-none" 
+                                             src="#" alt="Preview">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="image-upload">
-                                        <div class="image-preview mb-2" id="preview3">
-                                            <img src="" class="img-fluid rounded d-none">
-                                        </div>
-                                        <div class="input-group">
-                                            <input type="file" class="form-control" id="image3" name="image3" 
-                                                   accept="image/*" onchange="previewImage(this, 'preview3')">
-                                        </div>
-                                        <div class="form-text">Additional image (optional)</div>
+                                    <div class="image-upload-container">
+                                        <input type="file" class="form-control" id="image3" name="image3" 
+                                               accept="image/*" onchange="previewImage(this, 'preview3')">
+                                        <img id="preview3" class="img-preview mt-2 d-none" 
+                                             src="#" alt="Preview">
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Submit Button -->
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-plus me-2"></i>Add Bike
-                            </button>
-                            <a href="{{ url_for('my_bikes') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>Back to My Bikes
-                            </a>
+                            <button type="submit" class="btn btn-primary">Add Bike</button>
+                            <a href="{{ url_for('my_bikes') }}" class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>
@@ -144,62 +126,53 @@
 </div>
 {% endblock %}
 
-{% block extra_css %}
+{% block styles %}
 <style>
-.image-preview {
+.img-preview {
     width: 100%;
     height: 150px;
-    border: 2px dashed #ddd;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background: #f8f9fa;
-}
-
-.image-preview img {
-    max-width: 100%;
-    max-height: 100%;
     object-fit: cover;
+    border-radius: 4px;
+}
+.image-upload-container {
+    margin-bottom: 1rem;
 }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Form validation
-(function () {
-    'use strict'
-    var forms = document.querySelectorAll('.needs-validation')
-    Array.prototype.slice.call(forms).forEach(function (form) {
-        form.addEventListener('submit', function (event) {
-            if (!form.checkValidity()) {
-                event.preventDefault()
-                event.stopPropagation()
-            }
-            form.classList.add('was-validated')
-        }, false)
-    })
-})()
-
-// Set current year as max year
-document.getElementById('year').max = new Date().getFullYear();
-
-// Image preview
 function previewImage(input, previewId) {
-    const preview = document.querySelector(`#${previewId} img`);
-    preview.classList.remove('d-none');
-    
+    const preview = document.getElementById(previewId);
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
             preview.src = e.target.result;
+            preview.classList.remove('d-none');
         }
         reader.readAsDataURL(input.files[0]);
     } else {
-        preview.src = '';
+        preview.src = '#';
         preview.classList.add('d-none');
+    }
+}
+
+function updatePriceFields() {
+    const rentalField = document.getElementById('rentalPriceField');
+    const saleField = document.getElementById('salePriceField');
+    const rentalPrice = document.getElementById('price_per_day');
+    const salePrice = document.getElementById('sale_price');
+    
+    if (document.getElementById('typeRent').checked) {
+        rentalField.style.display = 'block';
+        saleField.style.display = 'none';
+        rentalPrice.required = true;
+        salePrice.required = false;
+    } else {
+        rentalField.style.display = 'none';
+        saleField.style.display = 'block';
+        rentalPrice.required = false;
+        salePrice.required = true;
     }
 }
 </script>

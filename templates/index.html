@@ -3,58 +3,145 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<div class="jumbotron bg-light p-5 rounded">
-    <h1 class="display-4">Welcome to Bike Rental</h1>
-    <p class="lead">Find and rent the perfect bike for your next adventure!</p>
-    {% if not session.get('user_id') %}
-        <hr class="my-4">
-        <p>Join our community to start renting or listing your bikes.</p>
-        <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}" role="button">Get Started</a>
-    {% endif %}
-</div>
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="display-4 mb-3">Find Your Perfect Bike</h1>
+            <p class="lead text-muted">Rent or buy bikes from our community of cyclists</p>
+        </div>
+        {% if session.get('user_id') %}
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('add_bike') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>List Your Bike
+            </a>
+        </div>
+        {% endif %}
+    </div>
 
-<h2 class="mt-5 mb-4">Available Bikes</h2>
+    <!-- Listing Type Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="btn-group" role="group" aria-label="Listing type filter">
+                <button type="button" class="btn btn-outline-primary active" data-filter="all">All Listings</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="rent">For Rent</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="sale">For Sale</button>
+            </div>
+        </div>
+    </div>
 
-{% if bikes %}
-    <div class="row row-cols-1 row-cols-md-3 g-4">
+    <div class="row g-4">
         {% for bike in bikes %}
-            <div class="col-md-6 col-lg-4">
-                <div class="card h-100">
-                    {% if bike.image_url_1 %}
-                        <img src="{{ url_for('static', filename=bike.image_url_1) }}" 
-                             class="card-img-top" alt="{{ bike.name }}"
-                             style="height: 200px; object-fit: cover;">
-                    {% endif %}
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <h5 class="card-title mb-0">{{ bike.name }}</h5>
-                            <span class="badge {% if bike.is_available %}badge-success{% else %}badge-danger{% endif %}">
-                                {{ 'Available' if bike.is_available else 'Rented' }}
-                            </span>
+        <div class="col-md-6 col-lg-4 bike-card" data-type="{{ bike.listing_type }}">
+            <div class="card h-100 shadow-sm">
+                <div id="carousel{{ bike.id }}" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        {% if bike.image_url_1 %}
+                        <div class="carousel-item active">
+                            <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
                         </div>
-                        <h6 class="card-subtitle mb-2 text-muted">{{ bike.model }} ({{ bike.year }})</h6>
-                        <p class="card-text">{{ bike.description[:100] }}...</p>
-                        <ul class="list-unstyled">
-                            <li><i class="fas fa-tag me-2"></i>${{ "%.2f"|format(bike.price_per_day) }} per day</li>
-                            <li><i class="fas fa-info-circle me-2"></i>{{ bike.condition }}</li>
-                        </ul>
+                        {% endif %}
+                        {% if bike.image_url_2 %}
+                        <div class="carousel-item">
+                            <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_2) }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
+                        </div>
+                        {% endif %}
+                        {% if bike.image_url_3 %}
+                        <div class="carousel-item">
+                            <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_3) }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
+                        </div>
+                        {% endif %}
                     </div>
-                    <div class="card-footer bg-transparent border-top-0">
-                        <a href="{{ url_for('view_bike', bike_id=bike.id) }}" class="btn btn-primary">View Details</a>
-                        {% if session.get('user_id') and session.get('user_id') != bike.owner_id %}
-                            <a href="{{ url_for('rent_bike', bike_id=bike.id) }}" class="btn btn-success">Rent Now</a>
+                    {% if bike.image_url_2 or bike.image_url_3 %}
+                    <button class="carousel-control-prev" type="button" data-bs-target="#carousel{{ bike.id }}" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#carousel{{ bike.id }}" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                    {% endif %}
+                </div>
+
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title mb-0">{{ bike.name }}</h5>
+                        <span class="badge {% if bike.listing_type == 'rent' %}bg-primary{% else %}bg-success{% endif %}">
+                            {% if bike.listing_type == 'rent' %}For Rent{% else %}For Sale{% endif %}
+                        </span>
+                    </div>
+                    
+                    <p class="card-text text-muted mb-2">
+                        {{ bike.model }} ({{ bike.year }}) • {{ bike.condition }}
+                    </p>
+                    
+                    <p class="card-text mb-3">
+                        {% if bike.listing_type == 'rent' %}
+                        <strong>${{ "%.2f"|format(bike.price_per_day) }}</strong> per day
+                        {% else %}
+                        <strong>${{ "%.2f"|format(bike.sale_price) }}</strong>
+                        {% endif %}
+                    </p>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('view_bike', bike_id=bike.id) }}" class="btn btn-outline-primary">
+                            View Details
+                        </a>
+                        {% if bike.is_available %}
+                        <span class="badge bg-success">Available</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Not Available</span>
                         {% endif %}
                     </div>
                 </div>
             </div>
+        </div>
         {% endfor %}
     </div>
-{% else %}
-    <div class="alert alert-info">
-        No bikes are currently available for rent.
-        {% if session.get('user_id') %}
-            <a href="{{ url_for('add_bike') }}">Add your bike</a> to be the first!
-        {% endif %}
-    </div>
-{% endif %}
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.card-img-top {
+    height: 200px;
+    object-fit: cover;
+}
+.carousel-control-prev,
+.carousel-control-next {
+    width: 10%;
+    background: rgba(0,0,0,0.2);
+}
+.carousel-control-prev:hover,
+.carousel-control-next:hover {
+    background: rgba(0,0,0,0.3);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterButtons = document.querySelectorAll('[data-filter]');
+    const bikeCards = document.querySelectorAll('.bike-card');
+
+    filterButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Update active state
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            const filterValue = button.getAttribute('data-filter');
+
+            bikeCards.forEach(card => {
+                if (filterValue === 'all' || card.getAttribute('data-type') === filterValue) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+});
+</script>
 {% endblock %}

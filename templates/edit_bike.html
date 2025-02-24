@@ -1,64 +1,135 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Bike{% endblock %}
+{% block title %}Edit {{ bike.name }}{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title mb-0">Edit Bike</h3>
-            </div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label for="name" class="form-label">Bike Name</label>
-                        <input type="text" class="form-control" id="name" name="name" value="{{ bike.name }}" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="model" class="form-label">Model</label>
-                        <input type="text" class="form-control" id="model" name="model" value="{{ bike.model }}" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="year" class="form-label">Year</label>
-                        <input type="number" class="form-control" id="year" name="year" value="{{ bike.year }}" min="1900" max="2024" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="condition" class="form-label">Condition</label>
-                        <select class="form-select" id="condition" name="condition" required>
-                            <option value="">Select condition...</option>
-                            <option value="Excellent" {% if bike.condition == 'Excellent' %}selected{% endif %}>Excellent</option>
-                            <option value="Good" {% if bike.condition == 'Good' %}selected{% endif %}>Good</option>
-                            <option value="Fair" {% if bike.condition == 'Fair' %}selected{% endif %}>Fair</option>
-                            <option value="Needs Repair" {% if bike.condition == 'Needs Repair' %}selected{% endif %}>Needs Repair</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="price_per_day" class="form-label">Price per Day ($)</label>
-                        <input type="number" class="form-control" id="price_per_day" name="price_per_day" value="{{ bike.price_per_day }}" min="0" step="0.01" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="4" required>{{ bike.description }}</textarea>
-                    </div>
-
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="is_available" name="is_available" {% if bike.is_available %}checked{% endif %}>
-                        <label class="form-check-label" for="is_available">Available for Rent</label>
-                    </div>
-                    
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                        <a href="{{ url_for('my_bikes') }}" class="btn btn-outline-secondary">Cancel</a>
-                    </div>
-                </form>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Edit Bike Details</h2>
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Bike Name</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ bike.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="model" class="form-label">Model</label>
+                            <input type="text" class="form-control" id="model" name="model" value="{{ bike.model }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="year" class="form-label">Year</label>
+                            <input type="number" class="form-control" id="year" name="year" value="{{ bike.year }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="condition" class="form-label">Condition</label>
+                            <select class="form-select" id="condition" name="condition" required>
+                                <option value="Excellent" {% if bike.condition == 'Excellent' %}selected{% endif %}>Excellent</option>
+                                <option value="Good" {% if bike.condition == 'Good' %}selected{% endif %}>Good</option>
+                                <option value="Fair" {% if bike.condition == 'Fair' %}selected{% endif %}>Fair</option>
+                                <option value="Poor" {% if bike.condition == 'Poor' %}selected{% endif %}>Poor</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="listing_type" class="form-label">Listing Type</label>
+                            <select class="form-select" id="listing_type" name="listing_type" required>
+                                <option value="rent" {% if bike.listing_type == 'rent' %}selected{% endif %}>For Rent</option>
+                                <option value="sale" {% if bike.listing_type == 'sale' %}selected{% endif %}>For Sale</option>
+                            </select>
+                        </div>
+                        <div class="mb-3" id="price_per_day_div" {% if bike.listing_type != 'rent' %}style="display: none;"{% endif %}>
+                            <label for="price_per_day" class="form-label">Price per Day ($)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="price_per_day" name="price_per_day" 
+                                   value="{{ '%.2f'|format(bike.price_per_day) if bike.price_per_day else '' }}">
+                        </div>
+                        <div class="mb-3" id="sale_price_div" {% if bike.listing_type != 'sale' %}style="display: none;"{% endif %}>
+                            <label for="sale_price" class="form-label">Sale Price ($)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="sale_price" name="sale_price" 
+                                   value="{{ '%.2f'|format(bike.sale_price) if bike.sale_price else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required>{{ bike.description }}</textarea>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Current Images</label>
+                            <div class="row">
+                                {% if bike.image_url_1 %}
+                                <div class="col-md-4 mb-3">
+                                    <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" class="img-thumbnail" alt="Bike image 1">
+                                </div>
+                                {% endif %}
+                                {% if bike.image_url_2 %}
+                                <div class="col-md-4 mb-3">
+                                    <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_2) }}" class="img-thumbnail" alt="Bike image 2">
+                                </div>
+                                {% endif %}
+                                {% if bike.image_url_3 %}
+                                <div class="col-md-4 mb-3">
+                                    <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_3) }}" class="img-thumbnail" alt="Bike image 3">
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Update Images (optional)</label>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="image1" class="form-label">Image 1</label>
+                                    <input type="file" class="form-control" id="image1" name="image1" accept="image/*">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="image2" class="form-label">Image 2</label>
+                                    <input type="file" class="form-control" id="image2" name="image2" accept="image/*">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="image3" class="form-label">Image 3</label>
+                                    <input type="file" class="form-control" id="image3" name="image3" accept="image/*">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="is_available" name="is_available" {% if bike.is_available %}checked{% endif %}>
+                                <label class="form-check-label" for="is_available">Make Available</label>
+                            </div>
+                            <small class="text-muted">Toggle this switch to make your bike available or unavailable for rent/sale.</small>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Update Bike</button>
+                            <a href="{{ url_for('my_bikes') }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const listingTypeSelect = document.getElementById('listing_type');
+    const pricePerDayDiv = document.getElementById('price_per_day_div');
+    const salePriceDiv = document.getElementById('sale_price_div');
+    const pricePerDayInput = document.getElementById('price_per_day');
+    const salePriceInput = document.getElementById('sale_price');
+
+    function updatePriceFields() {
+        if (listingTypeSelect.value === 'rent') {
+            pricePerDayDiv.style.display = 'block';
+            salePriceDiv.style.display = 'none';
+            salePriceInput.value = '';
+        } else {
+            pricePerDayDiv.style.display = 'none';
+            salePriceDiv.style.display = 'block';
+            pricePerDayInput.value = '';
+        }
+    }
+
+    listingTypeSelect.addEventListener('change', updatePriceFields);
+});
+</script>
 {% endblock %}
