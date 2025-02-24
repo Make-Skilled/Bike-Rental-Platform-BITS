@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Rent Bike{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">Rent Bike: {{ bike.name }}</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h5>Bike Details</h5>
+                    <ul class="list-unstyled">
+                        <li><strong>Model:</strong> {{ bike.model }}</li>
+                        <li><strong>Year:</strong> {{ bike.year }}</li>
+                        <li><strong>Condition:</strong> {{ bike.condition }}</li>
+                        <li><strong>Price per Day:</strong> ${{ "%.2f"|format(bike.price_per_day) }}</li>
+                    </ul>
+                </div>
+
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" 
+                               min="{{ today }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" 
+                               min="{{ today }}" required>
+                    </div>
+
+                    <div class="alert alert-info mb-4">
+                        <div class="mb-2">
+                            <strong>Total Days:</strong> <span id="total_days">0</span>
+                        </div>
+                        <div>
+                            <strong>Total Price:</strong> $<span id="total_price">0.00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">Confirm Rental</button>
+                        <a href="{{ url_for('view_bike', bike_id=bike.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    function calculateTotal() {
+        const startDate = new Date(document.getElementById('start_date').value);
+        const endDate = new Date(document.getElementById('end_date').value);
+        const pricePerDay = {{ bike.price_per_day }};
+        
+        if (startDate && endDate && endDate >= startDate) {
+            const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+            const totalPrice = days * pricePerDay;
+            
+            document.getElementById('total_days').textContent = days;
+            document.getElementById('total_price').textContent = totalPrice.toFixed(2);
+        } else {
+            document.getElementById('total_days').textContent = '0';
+            document.getElementById('total_price').textContent = '0.00';
+        }
+    }
+
+    document.getElementById('start_date').addEventListener('change', calculateTotal);
+    document.getElementById('end_date').addEventListener('change', calculateTotal);
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}My Rental Requests{% endblock %}
+
+{% block content %}
+<div class="container">
+    <ul class="nav nav-tabs mb-4" id="requestTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="received-tab" data-bs-toggle="tab" data-bs-target="#received" type="button">
+                Received Requests
+                {% if received_requests %}
+                    <span class="badge bg-primary ms-2">{{ received_requests|length }}</span>
+                {% endif %}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="sent-tab" data-bs-toggle="tab" data-bs-target="#sent" type="button">
+                Sent Requests
+                {% if sent_requests %}
+                    <span class="badge bg-primary ms-2">{{ sent_requests|length }}</span>
+                {% endif %}
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="requestTabsContent">
+        <!-- Received Requests -->
+        <div class="tab-pane fade show active" id="received" role="tabpanel">
+            <h3 class="mb-4">Requests for Your Bikes</h3>
+            {% if received_requests %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Bike</th>
+                                <th>Requester</th>
+                                <th>Dates</th>
+                                <th>Message</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in received_requests %}
+                                <tr>
+                                    <td>#{{ request.id }}</td>
+                                    <td>
+                                        <a href="{{ url_for('view_bike', bike_id=request.bike.id) }}" class="text-decoration-none">
+                                            {{ request.bike.name }}
+                                        </a>
+                                        <div class="text-muted small">{{ request.bike.model }} ({{ request.bike.year }})</div>
+                                    </td>
+                                    <td>
+                                        {{ request.requester.username }}
+                                        <div class="text-muted small">{{ request.requester.email }}</div>
+                                    </td>
+                                    <td>
+                                        {{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}
+                                        <div class="text-muted small">{{ (request.end_date - request.start_date).days }} days</div>
+                                        <div class="text-muted small">Total: ${{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</div>
+                                    </td>
+                                    <td>
+                                        {% if request.message %}
+                                            <button class="btn btn-sm btn-link" data-bs-toggle="tooltip" title="{{ request.message }}">
+                                                View Message
+                                            </button>
+                                        {% else %}
+                                            <span class="text-muted">No message</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if request.status == 'pending' %}bg-warning
+                                                       {% elif request.status == 'approved' %}bg-success
+                                                       {% else %}bg-danger{% endif %}">
+                                            {{ request.status.title() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if request.status == 'pending' %}
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-success" onclick="handleRequest({{ request.id }}, 'approve')">
+                                                    <i class="fas fa-check me-1"></i>Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="handleRequest({{ request.id }}, 'reject')">
+                                                    <i class="fas fa-times me-1"></i>Reject
+                                                </button>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>You haven't received any rental requests yet.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Sent Requests -->
+        <div class="tab-pane fade" id="sent" role="tabpanel">
+            <h3 class="mb-4">Your Rental Requests</h3>
+            {% if sent_requests %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Bike</th>
+                                <th>Owner</th>
+                                <th>Dates</th>
+                                <th>Total Price</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in sent_requests %}
+                                <tr>
+                                    <td>#{{ request.id }}</td>
+                                    <td>
+                                        <a href="{{ url_for('view_bike', bike_id=request.bike.id) }}" class="text-decoration-none">
+                                            {{ request.bike.name }}
+                                        </a>
+                                        <div class="text-muted small">{{ request.bike.model }} ({{ request.bike.year }})</div>
+                                    </td>
+                                    <td>
+                                        {{ request.bike.owner.username }}
+                                        <div class="text-muted small">{{ request.bike.owner.email }}</div>
+                                    </td>
+                                    <td>
+                                        {{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}
+                                        <div class="text-muted small">{{ (request.end_date - request.start_date).days }} days</div>
+                                    </td>
+                                    <td>${{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</td>
+                                    <td>
+                                        <span class="badge {% if request.status == 'pending' %}bg-warning
+                                                       {% elif request.status == 'approved' %}bg-success
+                                                       {% else %}bg-danger{% endif %}">
+                                            {{ request.status.title() }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>You haven't sent any rental requests yet.
+                    <a href="{{ url_for('index') }}" class="alert-link">Browse available bikes!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    // Enable tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+
+    // Handle request approval/rejection
+    function handleRequest(requestId, action) {
+        if (confirm(`Are you sure you want to ${action} this request?`)) {
+            fetch(`/rental-requests/${requestId}/${action}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to update request status. Please try again.');
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}
+{% endblock %}

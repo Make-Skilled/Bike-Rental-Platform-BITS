@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="jumbotron bg-light p-5 rounded">
+    <h1 class="display-4">Welcome to Bike Rental</h1>
+    <p class="lead">Find and rent the perfect bike for your next adventure!</p>
+    {% if not session.get('user_id') %}
+        <hr class="my-4">
+        <p>Join our community to start renting or listing your bikes.</p>
+        <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}" role="button">Get Started</a>
+    {% endif %}
+</div>
+
+<h2 class="mt-5 mb-4">Available Bikes</h2>
+
+{% if bikes %}
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        {% for bike in bikes %}
+            <div class="col">
+                <div class="card h-100 bike-card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ bike.name }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">{{ bike.model }} ({{ bike.year }})</h6>
+                        <p class="card-text">{{ bike.description[:100] }}...</p>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-tag me-2"></i>${{ "%.2f"|format(bike.price_per_day) }} per day</li>
+                            <li><i class="fas fa-info-circle me-2"></i>{{ bike.condition }}</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent border-top-0">
+                        <a href="{{ url_for('view_bike', bike_id=bike.id) }}" class="btn btn-primary">View Details</a>
+                        {% if session.get('user_id') and session.get('user_id') != bike.owner_id %}
+                            <a href="{{ url_for('rent_bike', bike_id=bike.id) }}" class="btn btn-success">Rent Now</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info">
+        No bikes are currently available for rent.
+        {% if session.get('user_id') %}
+            <a href="{{ url_for('add_bike') }}">Add your bike</a> to be the first!
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}
