@@ -5,9 +5,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
 from werkzeug.utils import secure_filename
+from pymongo import MongoClient
 
 # Load environment variables
 load_dotenv()
@@ -31,19 +32,45 @@ db = SQLAlchemy(app)
 mail = Mail(app)
 
 def send_email(to, subject, body):
-    if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
-        print(f"Email not sent (mail not configured) - To: {to}, Subject: {subject}")
-        return True
+    """
+    Send email with improved error handling and logging
+    Returns: Boolean indicating success/failure
+    """
+    if not all([
+        app.config['MAIL_USERNAME'],
+        app.config['MAIL_PASSWORD'],
+        app.config['MAIL_SERVER'],
+        app.config['MAIL_PORT']
+    ]):
+        print("Email configuration error:")
+        print(f"MAIL_USERNAME: {app.config['MAIL_USERNAME']}")
+        print(f"MAIL_SERVER: {app.config['MAIL_SERVER']}")
+        print(f"MAIL_PORT: {app.config['MAIL_PORT']}")
+        return False
+
+    if not to:
+        print("No recipient email provided")
+        return False
+
     try:
         msg = Message(
             subject=subject,
             recipients=[to],
-            body=body
+            body=body,
+            sender=app.config['MAIL_DEFAULT_SENDER']
         )
-        mail.send(msg)
-        return True
+        
+        # Add error handling around the actual send
+        try:
+            mail.send(msg)
+            print(f"Email sent successfully to {to}")
+            return True
+        except Exception as send_error:
+            print(f"SMTP Error sending to {to}: {str(send_error)}")
+            return False
+            
     except Exception as e:
-        print(f"Error sending email: {str(e)}")
+        print(f"Error creating email message: {str(e)}")
         return False
 
 # Add configurations for image uploads
@@ -57,22 +84,25 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    if filename.startswith('bike_images/'):
-        # For bike images, serve from the bike_images subdirectory
-        image_filename = filename.split('/')[-1]
-        return send_from_directory(app.config['UPLOAD_FOLDER'], image_filename)
-    # For other static files
-    return send_from_directory('static', filename)
-
 def save_image(file):
     if file and allowed_file(file.filename):
         filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
-        return os.path.join('bike_images', filename)  # Return relative path
+        # Use forward slashes for URL paths
+        return 'bike_images/' + filename  # Return relative path with forward slash
     return None
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    # Normalize the path to use forward slashes
+    filename = filename.replace('\\', '/')
+    if filename.startswith('bike_images/'):
+        # For bike images, serve from the bike_images subdirectory
+        image_name = filename.replace('bike_images/', '')
+        return send_from_directory(app.config['UPLOAD_FOLDER'], image_name)
+    # For other static files
+    return send_from_directory('static', filename)
 
 # User Model
 class User(db.Model):
@@ -92,9 +122,12 @@ class User(db.Model):
 class Bike(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    name = db.Column(db.String(100), nullable=False)
+    brand = db.Column(db.String(50), nullable=False)
     model = db.Column(db.String(100), nullable=False)
     year = db.Column(db.Integer, nullable=False)
+    engine_cc = db.Column(db.Integer, nullable=False)
+    km_driven = db.Column(db.Integer, nullable=False)
+    mileage = db.Column(db.Float, nullable=False)
     condition = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -137,15 +170,37 @@ class RentalRequest(db.Model):
 # Purchase Model
 class Purchase(db.Model):
     __tablename__ = 'purchase'
+    
+    # Primary Key
     id = db.Column(db.Integer, primary_key=True)
+    
+    # Core Details
     bike_id = db.Column(db.Integer, db.ForeignKey('bike.id'), nullable=False)
     buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     price = db.Column(db.Float, nullable=False)
-    message = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), nullable=False, default='pending')  # pending, accepted, rejected
+    
+    # Status and Messages
+    status = db.Column(db.String(20), nullable=False, default='pending')  # pending, accepted, rejected, completed, cancelled
+    message = db.Column(db.Text, nullable=True)  # Buyer's message
+    
+    # Timestamps
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        """Convert purchase object to dictionary"""
+        return {
+            'id': self.id,
+            'bike_id': self.bike_id,
+            'buyer_id': self.buyer_id,
+            'seller_id': self.seller_id,
+            'price': self.price,
+            'status': self.status,
+            'message': self.message,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
 
 # Login decorator
 def login_required(f):
@@ -223,19 +278,22 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip().lower()
-        password = request.form.get('password', '')
+        username = request.form['username']
+        password = request.form['password']
         
+        # First try to find user by username
         user = User.query.filter_by(username=username).first()
+        
+        # If user not found by username, try email (as fallback)
+        if not user:
+            user = User.query.filter_by(email=username).first()
         
         if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
-            session['username'] = user.username
-            flash('Welcome back!')
-            return redirect(url_for('index'))
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('my_bikes'))
         
-        flash('Invalid username or password')
-    
+        flash('Invalid username/email or password', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -244,79 +302,190 @@ def logout():
     flash('You have been logged out')
     return redirect(url_for('index'))
 
+# MongoDB connection
+mongo_client = MongoClient(os.getenv('MONGO_URI'))
+mongo_db = mongo_client['bike_rental']
+bikes_collection = mongo_db['bikes']
+
 # Bike Management Routes
 @app.route('/bikes/add', methods=['GET', 'POST'])
 @login_required
 def add_bike():
-    if request.method == 'POST':
-        try:
-            name = request.form.get('name')
-            model = request.form.get('model')
-            year = request.form.get('year')
-            condition = request.form.get('condition')
-            listing_type = request.form.get('listing_type')
-            if listing_type == 'rent':
-                price_per_day = float(request.form.get('price_per_day'))
-                sale_price = None
-            elif listing_type == 'sale':
-                price_per_day = None
-                sale_price = float(request.form.get('sale_price'))
-            else:
-                flash('Invalid listing type', 'danger')
-                return redirect(url_for('add_bike'))
-            
-            description = request.form.get('description')
+    if request.method == 'GET':
+        return render_template('add_bike.html')
 
-            # Handle image uploads
-            image_urls = []
-            for i in range(1, 4):
-                image = request.files.get(f'image{i}')
-                if image and allowed_file(image.filename):
-                    filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
-                    image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    image_urls.append(os.path.join('bike_images', filename))  # Store the relative path
-                else:
-                    image_urls.append(None)
+    try:
+        # Determine if it's an API request
+        is_api = request.headers.get('Content-Type') == 'application/json'
+        
+        # Get data from either JSON or form
+        data = request.get_json() if is_api else request.form
+        files = {} if is_api else request.files
 
-            new_bike = Bike(
-                name=name,
-                model=model,
-                year=year,
-                condition=condition,
-                listing_type=listing_type,
-                price_per_day=price_per_day,
-                sale_price=sale_price,
-                description=description,
-                owner_id=session['user_id'],
-                image_url_1=image_urls[0],
-                image_url_2=image_urls[1],
-                image_url_3=image_urls[2]
-            )
-
-            db.session.add(new_bike)
-            db.session.commit()
-            flash('Bike added successfully!', 'success')
-            return redirect(url_for('my_bikes'))
-
-        except Exception as e:
-            print(f"Error adding bike: {str(e)}")
-            db.session.rollback()
-            flash('Error adding bike. Please try again.', 'danger')
+        # Validate required fields based on the Bike model
+        required_fields = [
+            'brand',
+            'model',
+            'year',
+            'engine_cc',
+            'km_driven',
+            'mileage',
+            'condition',
+            'description',
+            'listing_type'
+        ]
+        
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            error_msg = f"Missing required fields: {', '.join(missing_fields)}"
+            if is_api:
+                return jsonify({'error': error_msg}), 400
+            flash(error_msg, 'danger')
             return redirect(url_for('add_bike'))
 
-    return render_template('add_bike.html')
+        # Validate listing type and prices
+        listing_type = data.get('listing_type')
+        if listing_type == 'rent':
+            price_per_day = float(data.get('price_per_day', 0))
+            sale_price = None
+            if not price_per_day:
+                error_msg = 'Price per day is required for rental listings'
+                if is_api:
+                    return jsonify({'error': error_msg}), 400
+                flash(error_msg, 'danger')
+                return redirect(url_for('add_bike'))
+        elif listing_type == 'sale':
+            price_per_day = None
+            sale_price = float(data.get('sale_price', 0))
+            if not sale_price:
+                error_msg = 'Sale price is required for sale listings'
+                if is_api:
+                    return jsonify({'error': error_msg}), 400
+                flash(error_msg, 'danger')
+                return redirect(url_for('add_bike'))
+        else:
+            error_msg = 'Invalid listing type'
+            if is_api:
+                return jsonify({'error': error_msg}), 400
+            flash(error_msg, 'danger')
+            return redirect(url_for('add_bike'))
+
+        # Handle image uploads
+        image_urls = []
+        for i in range(1, 4):
+            image = files.get(f'image{i}') if not is_api else None
+            if image and allowed_file(image.filename):
+                filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                image_urls.append(os.path.join('bike_images', filename))
+            else:
+                image_urls.append(None)
+
+        # Create SQL bike record with all required fields
+        new_bike = Bike(
+            brand=data.get('brand'),
+            model=data.get('model'),
+            year=int(data.get('year')),
+            engine_cc=int(data.get('engine_cc')),
+            km_driven=int(data.get('km_driven')),
+            mileage=float(data.get('mileage')),
+            condition=data.get('condition'),
+            description=data.get('description'),
+            listing_type=listing_type,
+            price_per_day=price_per_day,
+            sale_price=sale_price,
+            owner_id=session['user_id'],
+            image_url_1=image_urls[0],
+            image_url_2=image_urls[1],
+            image_url_3=image_urls[2]
+        )
+
+        db.session.add(new_bike)
+        db.session.commit()
+
+        # Update MongoDB document structure
+        mongo_bike = {
+            'sql_id': new_bike.id,
+            'brand': data.get('brand'),
+            'model': data.get('model'),
+            'year': int(data.get('year')),
+            'engine_cc': int(data.get('engine_cc')),
+            'km_driven': int(data.get('km_driven')),
+            'mileage': float(data.get('mileage')),
+            'condition': data.get('condition'),
+            'listing_type': listing_type,
+            'price_per_day': price_per_day,
+            'sale_price': sale_price,
+            'description': data.get('description'),
+            'owner_id': session['user_id'],
+            'images': image_urls,
+            'created_at': datetime.utcnow(),
+            'is_available': True,
+            'metadata': {
+                'views': 0,
+                'favorites': 0,
+                'last_viewed': None,
+                'search_keywords': [
+                    data.get('brand', '').lower(),
+                    data.get('model', '').lower(),
+                    str(data.get('year')),
+                    data.get('condition', '').lower()
+                ]
+            }
+        }
+
+        bikes_collection.insert_one(mongo_bike)
+
+        if is_api:
+            return jsonify({
+                'status': 'success',
+                'message': 'Bike added successfully',
+                'bike': {
+                    'id': new_bike.id,
+                    'brand': new_bike.brand,
+                    'model': new_bike.model,
+                    'year': new_bike.year,
+                    'listing_type': new_bike.listing_type,
+                    'price_per_day': new_bike.price_per_day,
+                    'sale_price': new_bike.sale_price,
+                    'images': image_urls
+                }
+            }), 201
+
+        flash('Bike added successfully!', 'success')
+        return redirect(url_for('my_bikes'))
+
+    except Exception as e:
+        db.session.rollback()
+        # Cleanup MongoDB if SQL insert failed
+        if 'new_bike' in locals() and new_bike.id:
+            bikes_collection.delete_one({'sql_id': new_bike.id})
+        
+        error_msg = f"Error adding bike: {str(e)}"
+        if is_api:
+            return jsonify({'error': error_msg}), 500
+        
+        print(error_msg)
+        flash('Error adding bike. Please try again.', 'danger')
+        return redirect(url_for('add_bike'))
 
 @app.route('/bikes/my-bikes')
 @login_required
 def my_bikes():
-    user = User.query.get(session['user_id'])
+    user = User.query.get(session.get('user_id'))
+    if not user:
+        flash('Please login first', 'danger')
+        return redirect(url_for('login'))
+    
     return render_template('my_bikes.html', bikes=user.owned_bikes)
 
 @app.route('/bikes/<int:bike_id>')
 def view_bike(bike_id):
     bike = Bike.query.get_or_404(bike_id)
-    # Get current and future rentals for this bike
     current_time = datetime.utcnow()
+    
+    # Get current and future rentals for this bike
     active_rentals = Rental.query.filter(
         Rental.bike_id == bike_id,
         Rental.status == 'active',
@@ -329,11 +498,18 @@ def view_bike(bike_id):
         RentalRequest.status == 'pending'
     ).order_by(RentalRequest.created_at).all()
     
+    # Get pending purchase requests
+    pending_purchases = Purchase.query.filter(
+        Purchase.bike_id == bike_id,
+        Purchase.status == 'pending'
+    ).order_by(Purchase.created_at).all()
+    
     return render_template('view_bike.html', 
-                           bike=bike, 
-                           active_rentals=active_rentals,
-                           pending_requests=pending_requests,
-                           current_time=current_time)
+                         bike=bike, 
+                         active_rentals=active_rentals,
+                         pending_requests=pending_requests,
+                         pending_purchases=pending_purchases,
+                         current_time=current_time)
 
 @app.route('/bikes/<int:bike_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -459,106 +635,107 @@ def request_rental(bike_id):
         
     return render_template('request_rental.html', bike=bike, today=datetime.now().strftime('%Y-%m-%d'))
 
-@app.route('/bikes/purchase/<int:bike_id>', methods=['POST'])
+@app.route('/bikes/purchase/<int:bike_id>', methods=['GET', 'POST'])
 @login_required
 def request_purchase(bike_id):
     bike = Bike.query.get_or_404(bike_id)
-    
-    if not bike.is_available:
-        flash('Sorry, this bike is no longer available.', 'danger')
-        return redirect(url_for('view_bike', bike_id=bike_id))
-        
-    if bike.owner_id == session['user_id']:
-        flash('You cannot purchase your own bike.', 'danger')
-        return redirect(url_for('view_bike', bike_id=bike_id))
-        
-    if bike.listing_type != 'sale':
-        flash('This bike is not listed for sale.', 'danger')
-        return redirect(url_for('view_bike', bike_id=bike_id))
-    
-    # Check if user already has a pending request for this bike
-    existing_request = Purchase.query.filter_by(
-        bike_id=bike_id,
-        buyer_id=session['user_id'],
-        status='pending'
-    ).first()
-    
-    if existing_request:
-        flash('You already have a pending request for this bike.', 'info')
-        return redirect(url_for('view_bike', bike_id=bike_id))
-    
-    try:
-        buyer = User.query.get(session['user_id'])
-        seller = bike.owner_user
-        message = request.form.get('message', '')
-        
-        # Create a new purchase request
-        purchase = Purchase(
-            bike_id=bike_id,
-            buyer_id=session['user_id'],
-            seller_id=bike.owner_id,
-            price=bike.sale_price,
-            message=message
-        )
-        
-        db.session.add(purchase)
-        db.session.commit()
-        
-        # Send email notifications
-        send_email(
-            to=buyer.email,
-            subject=f"Purchase Request Sent - {bike.name}",
-            body=f"""Hi {buyer.username},
+    buyer = User.query.get(session['user_id'])
+    seller = bike.owner_user
 
-Your purchase request has been sent for {bike.name}.
+    if request.method == 'POST':
+        try:
+            # Validate request data
+            message = request.form.get('message', '')
 
-Bike Details:
-- Name: {bike.name}
-- Model: {bike.model}
-- Year: {bike.year}
-- Price: ${bike.sale_price}
+            # Validate bike availability and conditions
+            if not bike.is_available:
+                flash('Sorry, this bike is no longer available.', 'error')
+                return render_template('view_bike.html', bike=bike, error='Bike not available')
 
-Seller Details:
-- Name: {seller.username}
-- Contact: {seller.mobile if seller.mobile else 'Not provided'}
+            if bike.owner_id == session['user_id']:
+                flash('You cannot purchase your own bike.', 'error')
+                return render_template('view_bike.html', bike=bike, error='Cannot purchase own bike')
 
-Your message to the seller:
-{message}
+            if bike.listing_type != 'sale':
+                flash('This bike is not listed for sale.', 'error')
+                return render_template('view_bike.html', bike=bike, error='Bike not for sale')
 
-The seller will review your request and contact you if they accept.
+            # Check for existing pending request
+            existing_request = Purchase.query.filter_by(
+                bike_id=bike_id,
+                buyer_id=session['user_id'],
+                status='pending'
+            ).first()
+
+            if existing_request:
+                flash('You already have a pending request for this bike.', 'warning')
+                return render_template('view_bike.html', bike=bike, error='Existing request pending')
+
+            # Create purchase request
+            purchase = Purchase(
+                bike_id=bike_id,
+                buyer_id=session['user_id'],
+                seller_id=bike.owner_id,
+                price=bike.sale_price,
+                message=message,
+                status='pending',
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+
+            db.session.add(purchase)
+            db.session.commit()
+
+            # Send notifications
+            try:
+                send_email(
+                    to=buyer.email,
+                    subject=f"Purchase Request Sent - {bike.brand}",
+                    body=f"""Hi {buyer.username},
+
+Your purchase request has been sent for {bike.brand}.
+
+Details:
+- Bike: {bike.brand} ({bike.year} {bike.brand} {bike.model})
+- Price: ${bike.sale_price:,.2f}
+
+The seller will review your request and respond soon.
 
 Best regards,
 The Bike Rental Team"""
-        )
-        
-        send_email(
-            to=seller.email,
-            subject=f"New Purchase Request - {bike.name}",
-            body=f"""Hi {seller.username},
+                )
 
-{buyer.username} is interested in buying your bike {bike.name}.
+                send_email(
+                    to=seller.email,
+                    subject=f"New Purchase Request - {bike.brand}",
+                    body=f"""Hi {seller.username},
+
+{buyer.username} wants to buy your {bike.brand}.
 
 Buyer Details:
 - Name: {buyer.username}
 - Contact: {buyer.mobile if buyer.mobile else 'Not provided'}
 
-Their message:
-{message}
+Message: {message}
 
-Please review this request in your dashboard and accept or reject it.
+Review this request in your dashboard.
 
 Best regards,
 The Bike Rental Team"""
-        )
-        
-        flash('Your purchase request has been sent! You will be notified when the seller responds.', 'success')
-        return redirect(url_for('my_purchase_requests'))
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error processing purchase request: {str(e)}")
-        flash('Error processing your request. Please try again.', 'danger')
-        return redirect(url_for('view_bike', bike_id=bike_id))
+                )
+            except Exception as e:
+                print(f"Error sending emails: {str(e)}")
+
+            flash('Purchase request sent successfully!', 'success')
+            return render_template('view_bike.html', bike=bike, success=True, purchase=purchase)
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error processing purchase request: {str(e)}', 'error')
+            return render_template('view_bike.html', bike=bike, error=str(e))
+
+    # GET request - show purchase form
+    return render_template('view_bike.html', bike=bike)
 
 @app.route('/my-purchase-requests')
 @login_required
@@ -614,10 +791,10 @@ def handle_purchase_request(request_id):
                 # Send rejection email
                 send_email(
                     to=req.buyer_user.email,
-                    subject=f"Purchase Request Rejected - {bike.name}",
+                    subject=f"Purchase Request Rejected - {bike.brand}",
                     body=f"""Hi {req.buyer_user.username},
 
-Unfortunately, your purchase request for {bike.name} was not accepted as the bike has been sold to another buyer.
+Unfortunately, your purchase request for {bike.brand} was not accepted as the bike has been sold to another buyer.
 
 You can continue browsing other available bikes on our platform.
 
@@ -628,10 +805,10 @@ The Bike Rental Team"""
             # Send acceptance email
             send_email(
                 to=purchase.buyer_user.email,
-                subject=f"Purchase Request Accepted - {bike.name}",
+                subject=f"Purchase Request Accepted - {bike.brand}",
                 body=f"""Hi {purchase.buyer_user.username},
 
-Great news! {bike.owner_user.username} has accepted your purchase request for {bike.name}.
+Great news! {bike.owner_user.username} has accepted your purchase request for {bike.brand}.
 
 Seller Contact:
 {bike.owner_user.mobile if bike.owner_user.mobile else 'Not provided'}
@@ -645,10 +822,10 @@ The Bike Rental Team"""
             # Send notification to seller
             send_email(
                 to=bike.owner_user.email,
-                subject=f"You've Accepted a Purchase Request - {bike.name}",
+                subject=f"You've Accepted a Purchase Request - {bike.brand}",
                 body=f"""Hi {bike.owner_user.username},
 
-You have accepted the purchase request from {purchase.buyer_user.username} for your bike {bike.name}.
+You have accepted the purchase request from {purchase.buyer_user.username} for your bike {bike.brand}.
 
 Buyer Contact:
 {purchase.buyer_user.mobile if purchase.buyer_user.mobile else 'Not provided'}
@@ -664,10 +841,10 @@ The Bike Rental Team"""
             purchase.seller_id = session['user_id']  # Set the seller_id
             send_email(
                 to=purchase.buyer_user.email,
-                subject=f"Purchase Request Rejected - {bike.name}",
+                subject=f"Purchase Request Rejected - {bike.brand}",
                 body=f"""Hi {purchase.buyer_user.username},
 
-Unfortunately, your purchase request for {bike.name} was not accepted.
+Unfortunately, your purchase request for {bike.brand} was not accepted.
 
 You can continue browsing other available bikes on our platform.
 
@@ -752,15 +929,18 @@ def complete_rental(rental_id):
 def my_rental_requests():
     user_id = session['user_id']
     
+    # Get requests sent by the user
     sent_requests = RentalRequest.query.filter_by(renter_id=user_id).order_by(RentalRequest.created_at.desc()).all()
     
+    # Get bikes owned by the user with their request counts
     owned_bikes_info = db.session.execute("""
-        SELECT b.id, b.name, 
+        SELECT b.id, b.brand, b.model,
                (SELECT COUNT(*) FROM rental_request WHERE bike_id = b.id) as request_count
         FROM bike b 
         WHERE b.owner_id = :user_id
     """, {'user_id': user_id}).fetchall()
     
+    # Get requests received for user's bikes
     owned_bike_ids = [bike.id for bike in Bike.query.filter_by(owner_id=user_id).all()]
     
     received_requests = RentalRequest.query.filter(
@@ -769,7 +949,8 @@ def my_rental_requests():
     
     return render_template('my_rental_requests.html', 
                          sent_requests=sent_requests,
-                         received_requests=received_requests)
+                         received_requests=received_requests,
+                         owned_bikes_info=owned_bikes_info)
 
 @app.route('/rental-requests/<int:request_id>/handle', methods=['POST'])
 @login_required
@@ -855,7 +1036,7 @@ def send_purchase_confirmation_email(purchase):
     
     Purchase Details:
     - Bike: {bike_name}
-    - Price: ${purchase.price:.2f}
+    - Price: ₹{purchase.price:.2f}
     - Purchase Date: {purchase.purchase_date.strftime('%Y-%m-%d %H:%M:%S')}
     - Seller: {purchase.seller_user.username}
     
@@ -871,7 +1052,7 @@ def send_purchase_confirmation_email(purchase):
     
     Sale Details:
     - Bike: {bike_name}
-    - Price: ${purchase.price:.2f}
+    - Price: ₹{purchase.price:.2f}
     - Sale Date: {purchase.purchase_date.strftime('%Y-%m-%d %H:%M:%S')}
     - Buyer: {purchase.buyer_user.username}
     
@@ -899,6 +1080,284 @@ def init_db():
     with app.app_context():
         db.create_all()
         print("Database tables created successfully!")
+
+@app.route('/api/bikes/search', methods=['GET'])
+def search_bikes():
+    try:
+        # Get query parameters with defaults
+        name = request.args.get('name', '').strip()
+        model = request.args.get('model', '').strip()
+        year = request.args.get('year', type=int)
+        price_low = request.args.get('price_low', type=float, default=0)
+        price_high = request.args.get('price_high', type=float)
+
+        # Build MongoDB query
+        query = {'is_available': True}
+        
+        # Add filters if parameters are provided
+        if name:
+            query['name'] = {'$regex': name, '$options': 'i'}  # case-insensitive search
+        if model:
+            query['model'] = {'$regex': model, '$options': 'i'}
+        if year:
+            query['year'] = year
+            
+        # Price filter for both rental and sale listings
+        if price_high or price_low > 0:
+            price_query = []
+            if price_high:
+                price_query.append({
+                    'listing_type': 'rent',
+                    'price_per_day': {'$gte': price_low, '$lte': price_high}
+                })
+                price_query.append({
+                    'listing_type': 'sale',
+                    'sale_price': {'$gte': price_low, '$lte': price_high}
+                })
+            else:
+                price_query.append({
+                    'listing_type': 'rent',
+                    'price_per_day': {'$gte': price_low}
+                })
+                price_query.append({
+                    'listing_type': 'sale',
+                    'sale_price': {'$gte': price_low}
+                })
+            query['$or'] = price_query
+
+        # Execute MongoDB query
+        bikes = bikes_collection.find(query)
+
+        # Format results
+        results = []
+        for bike in bikes:
+            results.append({
+                'id': bike['sql_id'],  # Keep the SQL ID for compatibility
+                'name': bike['name'],
+                'model': bike['model'],
+                'year': bike['year'],
+                'condition': bike['condition'],
+                'listing_type': bike['listing_type'],
+                'price_per_day': bike['price_per_day'],
+                'sale_price': bike['sale_price'],
+                'is_available': bike['is_available'],
+                'owner': {
+                    'id': bike['owner_id'],
+                    'username': User.query.get(bike['owner_id']).username  # Get username from SQL
+                },
+                'images': bike['images'],
+                'metadata': {
+                    'views': bike['metadata']['views'],
+                    'favorites': bike['metadata']['favorites']
+                }
+            })
+
+        return jsonify({
+            'status': 'success',
+            'count': len(results),
+            'bikes': results
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/rental-requests', methods=['GET'])
+@login_required
+def get_rental_requests():
+    try:
+        # Get query parameters for filtering
+        status = request.args.get('status')
+        bike_id = request.args.get('bike_id')
+        renter_id = request.args.get('renter_id')
+
+        # Start with base query
+        query = RentalRequest.query
+
+        # Apply filters if provided
+        if status:
+            query = query.filter(RentalRequest.status == status)
+        if bike_id:
+            query = query.filter(RentalRequest.bike_id == bike_id)
+        if renter_id:
+            query = query.filter(RentalRequest.renter_id == renter_id)
+
+        # Order by created_at descending
+        rental_requests = query.order_by(RentalRequest.created_at.desc()).all()
+
+        # Format the response
+        requests_data = []
+        for request in rental_requests:
+            requests_data.append({
+                'id': request.id,
+                'bike_id': request.bike_id,
+                'bike': {
+                    'brand': request.bike.brand,
+                    'model': request.bike.model,
+                    'year': request.bike.year
+                },
+                'renter_id': request.renter_id,
+                'renter': {
+                    'username': request.renter.username,
+                    'email': request.renter.email
+                },
+                'start_date': request.start_date.strftime('%Y-%m-%d'),
+                'end_date': request.end_date.strftime('%Y-%m-%d'),
+                'status': request.status,
+                'message': request.message,
+                'created_at': request.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+        return jsonify({
+            'status': 'success',
+            'count': len(requests_data),
+            'rental_requests': requests_data
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/clear-rental-requests', methods=['GET'])
+def clear_rental_requests():
+    if not app.debug:
+        return jsonify({
+            'status': 'error',
+            'message': 'This endpoint is only available in debug mode'
+        }), 403
+    
+    try:
+        # Get optional parameters
+        status = request.args.get('status')  # Clear only requests with specific status
+        older_than = request.args.get('older_than')  # Clear requests older than X days
+        
+        # Start with base query
+        query = RentalRequest.query
+        
+        # Apply filters if provided
+        if status:
+            query = query.filter(RentalRequest.status == status)
+        if older_than:
+            cutoff_date = datetime.now(datetime.timezone.utc) - timedelta(days=int(older_than))
+            query = query.filter(RentalRequest.created_at < cutoff_date)
+            
+        # Count requests before deletion
+        count = query.count()
+        
+        # Delete the filtered requests
+        query.delete()
+        
+        # Commit the changes
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Successfully deleted {count} rental requests',
+            'count': count
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/dev/clear-db-confirm', methods=['GET'])
+def clear_db_confirm():
+    if not app.debug:
+        return "This route is only available in debug mode", 403
+            # Clear SQLite tables
+    db.drop_all()
+    db.create_all()
+            
+    # Clear MongoDB collections
+    mongo_db.bikes.delete_many({})
+            
+    flash("Databases cleared successfully!", "success")
+    
+    return redirect(url_for('index'))
+
+
+@app.route('/api/clear-purchases', methods=['GET'])
+def clear_purchases():
+    if not app.debug:
+        return jsonify({
+            'status': 'error',
+            'message': 'This endpoint is only available in debug mode'
+        }), 403
+    
+    try:
+        # Get optional parameters
+        status = request.args.get('status')  # Clear only purchases with specific status
+        older_than = request.args.get('older_than')  # Clear purchases older than X days
+        bike_id = request.args.get('bike_id')  # Clear purchases for specific bike
+        buyer_id = request.args.get('buyer_id')  # Clear purchases by specific buyer
+        seller_id = request.args.get('seller_id')  # Clear purchases by specific seller
+        
+        # Start with base query
+        query = Purchase.query
+        
+        # Apply filters if provided
+        if status:
+            query = query.filter(Purchase.status == status)
+        if older_than:
+            cutoff_date = datetime.utcnow() - timedelta(days=int(older_than))
+            query = query.filter(Purchase.created_at < cutoff_date)
+        if bike_id:
+            query = query.filter(Purchase.bike_id == int(bike_id))
+        if buyer_id:
+            query = query.filter(Purchase.buyer_id == int(buyer_id))
+        if seller_id:
+            query = query.filter(Purchase.seller_id == int(seller_id))
+            
+        # Count purchases before deletion
+        count = query.count()
+        
+        # Delete the filtered purchases
+        query.delete()
+        
+        # Commit the changes
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Successfully deleted {count} purchases',
+            'count': count
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/test-mail')
+def test_mail():
+    if not app.debug:
+        return "Test route only available in debug mode", 403
+    
+    success = send_email(
+        to=app.config['MAIL_USERNAME'],
+        subject="Test Email",
+        body="This is a test email to verify the configuration."
+    )
+    
+    return jsonify({
+        'success': success,
+        'mail_config': {
+            'server': app.config['MAIL_SERVER'],
+            'port': app.config['MAIL_PORT'],
+            'username': app.config['MAIL_USERNAME'],
+            'use_tls': app.config['MAIL_USE_TLS'],
+            'default_sender': app.config['MAIL_DEFAULT_SENDER']
+        }
+    })
 
 if __name__ == '__main__':
     with app.app_context():

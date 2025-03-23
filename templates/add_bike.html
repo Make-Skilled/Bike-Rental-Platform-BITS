@@ -11,35 +11,86 @@
                     <h2 class="card-title text-center mb-4">Add New Bike</h2>
                     
                     <form method="POST" enctype="multipart/form-data">
+                        <!-- Brand and Model Section -->
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="name" class="form-label">Bike Name</label>
-                                <input type="text" class="form-control" id="name" name="name" required>
+                                <label for="brand" class="form-label">Brand</label>
+                                <select class="form-select" id="brand" name="brand" required>
+                                    <option value="">Select brand...</option>
+                                    <option value="Honda">Honda</option>
+                                    <option value="Yamaha">Yamaha</option>
+                                    <option value="Suzuki">Suzuki</option>
+                                    <option value="Bajaj">Bajaj</option>
+                                    <option value="Royal Enfield">Royal Enfield</option>
+                                    <option value="KTM">KTM</option>
+                                </select>
                             </div>
                             <div class="col-md-6">
                                 <label for="model" class="form-label">Model</label>
-                                <input type="text" class="form-control" id="model" name="model" required>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="year" class="form-label">Year</label>
-                                <input type="number" class="form-control" id="year" name="year" 
-                                       min="1900" max="2025" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="condition" class="form-label">Condition</label>
-                                <select class="form-select" id="condition" name="condition" required>
-                                    <option value="">Select condition...</option>
-                                    <option value="Excellent">Excellent</option>
-                                    <option value="Good">Good</option>
-                                    <option value="Fair">Fair</option>
-                                    <option value="Poor">Poor</option>
+                                <select class="form-select" id="model" name="model" required>
+                                    <option value="">Select model...</option>
+                                    <!-- Will be populated via JavaScript -->
                                 </select>
                             </div>
                         </div>
 
+                        <!-- Year and Engine Section -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="year" class="form-label">Year</label>
+                                <input type="number" class="form-control" id="year" name="year" 
+                                       min="2015" max="2024" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="engine_cc" class="form-label">Engine Capacity (CC)</label>
+                                <select class="form-select" id="engine_cc" name="engine_cc" required>
+                                    <option value="">Select engine capacity...</option>
+                                    <option value="100">100 CC</option>
+                                    <option value="125">125 CC</option>
+                                    <option value="150">150 CC</option>
+                                    <option value="200">200 CC</option>
+                                    <option value="250">250 CC</option>
+                                    <option value="350">350 CC</option>
+                                    <option value="500">500 CC</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Mileage and KM Driven Section -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="mileage" class="form-label">Mileage (KMPL)</label>
+                                <select class="form-select" id="mileage" name="mileage" required>
+                                    <option value="">Select mileage...</option>
+                                    <option value="35">35 KMPL</option>
+                                    <option value="40">40 KMPL</option>
+                                    <option value="45">45 KMPL</option>
+                                    <option value="50">50 KMPL</option>
+                                    <option value="55">55 KMPL</option>
+                                    <option value="60">60 KMPL</option>
+                                    <option value="65">65 KMPL</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="km_driven" class="form-label">Kilometers Driven</label>
+                                <input type="number" class="form-control" id="km_driven" name="km_driven" 
+                                       min="0" max="100000" required>
+                            </div>
+                        </div>
+
+                        <!-- Condition Section -->
+                        <div class="mb-3">
+                            <label for="condition" class="form-label">Condition</label>
+                            <select class="form-select" id="condition" name="condition" required>
+                                <option value="">Select condition...</option>
+                                <option value="Excellent">Excellent</option>
+                                <option value="Good">Good</option>
+                                <option value="Fair">Fair</option>
+                                <option value="Poor">Poor</option>
+                            </select>
+                        </div>
+
+                        <!-- Listing Type Section -->
                         <div class="mb-3">
                             <label class="form-label">Listing Type</label>
                             <div class="d-flex gap-4">
@@ -60,10 +111,11 @@
                             </div>
                         </div>
 
+                        <!-- Price Fields -->
                         <div id="rentalPriceField" class="mb-3">
                             <label for="price_per_day" class="form-label">Rental Price (per day)</label>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text">₹</span>
                                 <input type="number" class="form-control" id="price_per_day" 
                                        name="price_per_day" step="0.01" min="0" required>
                             </div>
@@ -72,18 +124,23 @@
                         <div id="salePriceField" class="mb-3" style="display: none;">
                             <label for="sale_price" class="form-label">Sale Price</label>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text">₹</span>
                                 <input type="number" class="form-control" id="sale_price" 
                                        name="sale_price" step="0.01" min="0">
+                                <div id="suggestedPrice" class="form-text text-muted">
+                                    Suggested price range will appear here...
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Description Section -->
                         <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
                             <textarea class="form-control" id="description" name="description" 
                                     rows="4" required></textarea>
                         </div>
 
+                        <!-- Images Section -->
                         <div class="mb-3">
                             <label class="form-label">Images (Max 3)</label>
                             <div class="row g-3">
@@ -91,29 +148,27 @@
                                     <div class="image-upload-container">
                                         <input type="file" class="form-control" id="image1" name="image1" 
                                                accept="image/*" onchange="previewImage(this, 'preview1')">
-                                        <img id="preview1" class="img-preview mt-2 d-none" 
-                                             src="#" alt="Preview">
+                                        <img id="preview1" class="img-preview mt-2 d-none" src="#" alt="Preview">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="image-upload-container">
                                         <input type="file" class="form-control" id="image2" name="image2" 
                                                accept="image/*" onchange="previewImage(this, 'preview2')">
-                                        <img id="preview2" class="img-preview mt-2 d-none" 
-                                             src="#" alt="Preview">
+                                        <img id="preview2" class="img-preview mt-2 d-none" src="#" alt="Preview">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="image-upload-container">
                                         <input type="file" class="form-control" id="image3" name="image3" 
                                                accept="image/*" onchange="previewImage(this, 'preview3')">
-                                        <img id="preview3" class="img-preview mt-2 d-none" 
-                                             src="#" alt="Preview">
+                                        <img id="preview3" class="img-preview mt-2 d-none" src="#" alt="Preview">
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- Submit Buttons -->
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">Add Bike</button>
                             <a href="{{ url_for('my_bikes') }}" class="btn btn-outline-secondary">Cancel</a>
@@ -142,6 +197,31 @@
 
 {% block scripts %}
 <script>
+const brandModels = {
+    "Honda": ["CBR 150", "Shine", "Activa 125"],
+    "Yamaha": ["FZ-S", "R15", "Fascino"],
+    "Suzuki": ["Gixxer", "Access 125", "Intruder"],
+    "Bajaj": ["Pulsar 220", "Avenger 220", "Platina 100"],
+    "Royal Enfield": ["Classic 350", "Bullet 500", "Meteor 350"],
+    "KTM": ["Duke 200", "RC 390", "Adventure 250"]
+};
+
+// Update models when brand is selected
+document.getElementById('brand').addEventListener('change', function() {
+    const modelSelect = document.getElementById('model');
+    modelSelect.innerHTML = '<option value="">Select model...</option>';
+    
+    const selectedBrand = this.value;
+    if (selectedBrand && brandModels[selectedBrand]) {
+        brandModels[selectedBrand].forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            modelSelect.appendChild(option);
+        });
+    }
+});
+
 function previewImage(input, previewId) {
     const preview = document.getElementById(previewId);
     if (input.files && input.files[0]) {
@@ -173,7 +253,57 @@ function updatePriceFields() {
         saleField.style.display = 'block';
         rentalPrice.required = false;
         salePrice.required = true;
+        calculateSuggestedPrice();
     }
 }
+
+function calculateSuggestedPrice() {
+    // Get all the input values
+    const brand = document.getElementById('brand').value;
+    const year = parseInt(document.getElementById('year').value);
+    const engineCC = parseInt(document.getElementById('engine_cc').value);
+    const kmDriven = parseInt(document.getElementById('km_driven').value);
+    const condition = document.getElementById('condition').value;
+    
+    // Only calculate if all values are present
+    if (brand && year && engineCC && kmDriven && condition) {
+        // This is a simplified version of the price calculation logic from bikes.py
+        let basePrice = 50000; // Base price
+        
+        // Adjust based on engine capacity
+        const engineFactor = 0.7 + (engineCC - 100) / (500 - 100) * 0.6;
+        
+        // Adjust based on kilometers driven
+        const kmFactor = 1.2 - (kmDriven - 5000) / (80000 - 5000) * 0.6;
+        
+        // Adjust based on year
+        const yearFactor = 0.8 + (year - 2015) / (2024 - 2015) * 0.4;
+        
+        // Adjust based on condition
+        const conditionFactors = {
+            "Excellent": 1.2,
+            "Good": 1.0,
+            "Fair": 0.8,
+            "Poor": 0.6
+        };
+        
+        const finalPrice = basePrice * engineFactor * kmFactor * yearFactor * conditionFactors[condition];
+        
+        // Show suggested price range (±10% of calculated price)
+        const minPrice = Math.round(finalPrice * 0.9);
+        const maxPrice = Math.round(finalPrice * 1.1);
+        
+        document.getElementById('suggestedPrice').innerHTML = 
+            `Suggested price range: ₹${minPrice} - ₹${maxPrice}`;
+    }
+}
+
+// Add event listeners for price calculation
+['brand', 'year', 'engine_cc', 'km_driven', 'condition'].forEach(fieldId => {
+    document.getElementById(fieldId).addEventListener('change', calculateSuggestedPrice);
+});
+
+// Initialize price fields
+updatePriceFields();
 </script>
 {% endblock %}

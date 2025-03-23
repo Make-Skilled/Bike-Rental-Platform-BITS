@@ -17,7 +17,7 @@
         <div class="col">
             <div class="card h-100">
                 {% if bike.image_url_1 %}
-                <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" 
+                <img src="../static/{{ bike.image_url_1 }}" 
                      class="card-img-top" alt="{{ bike.name }}" style="height: 200px; object-fit: cover;">
                 {% endif %}
                 <div class="card-body">
@@ -31,9 +31,9 @@
                         <small class="text-muted">
                             <i class="fas fa-tag me-2"></i>
                             {% if bike.listing_type == 'rent' %}
-                                For Rent: ${{ "%.2f"|format(bike.price_per_day) }}/day
+                                For Rent: ₹{{ "%.2f"|format(bike.price_per_day) }}/day
                             {% else %}
-                                For Sale: ${{ "%.2f"|format(bike.sale_price) }}
+                                For Sale: ₹{{ "%.2f"|format(bike.sale_price) }}
                             {% endif %}
                         </small>
                     </p>

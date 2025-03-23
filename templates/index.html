@@ -30,24 +30,24 @@
     </div>
 
     <div class="row g-4">
-        {% for bike in bikes %}
+        {% for bike in bikes%}
         <div class="col-md-6 col-lg-4 bike-card" data-type="{{ bike.listing_type }}">
             <div class="card h-100 shadow-sm">
                 <div id="carousel{{ bike.id }}" class="carousel slide" data-bs-ride="carousel">
                     <div class="carousel-inner">
                         {% if bike.image_url_1 %}
                         <div class="carousel-item active">
-                            <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
+                            <img src="../static/{{ bike.image_url_1 }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
                         </div>
                         {% endif %}
                         {% if bike.image_url_2 %}
                         <div class="carousel-item">
-                            <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_2) }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
+                            <img src="../static/{{ bike.image_url_2 }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
                         </div>
                         {% endif %}
                         {% if bike.image_url_3 %}
                         <div class="carousel-item">
-                            <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_3) }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
+                            <img src="../static/{{ bike.image_url_3 }}" class="d-block w-100 card-img-top" alt="{{ bike.name }}">
                         </div>
                         {% endif %}
                     </div>
@@ -77,9 +77,9 @@
                     
                     <p class="card-text mb-3">
                         {% if bike.listing_type == 'rent' %}
-                        <strong>${{ "%.2f"|format(bike.price_per_day) }}</strong> per day
+                        <strong>₹{{ "%.2f"|format(bike.price_per_day) }}</strong> per day
                         {% else %}
-                        <strong>${{ "%.2f"|format(bike.sale_price) }}</strong>
+                        <strong>₹{{ "%.2f"|format(bike.sale_price) }}</strong>
                         {% endif %}
                     </p>
 

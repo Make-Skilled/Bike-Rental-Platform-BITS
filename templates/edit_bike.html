@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Edit {{ bike.name }}{% endblock %}
+{% block title %}Edit {{ bike.brand }} {{ bike.model }}{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -11,17 +11,39 @@
                     <h2 class="card-title mb-4">Edit Bike Details</h2>
                     <form method="POST" enctype="multipart/form-data">
                         <div class="mb-3">
-                            <label for="name" class="form-label">Bike Name</label>
-                            <input type="text" class="form-control" id="name" name="name" value="{{ bike.name }}" required>
+                            <label for="brand" class="form-label">Brand</label>
+                            <input type="text" class="form-control" id="brand" name="brand" value="{{ bike.brand }}" required>
                         </div>
+                        
                         <div class="mb-3">
                             <label for="model" class="form-label">Model</label>
                             <input type="text" class="form-control" id="model" name="model" value="{{ bike.model }}" required>
                         </div>
+                        
                         <div class="mb-3">
                             <label for="year" class="form-label">Year</label>
-                            <input type="number" class="form-control" id="year" name="year" value="{{ bike.year }}" required>
+                            <input type="number" class="form-control" id="year" name="year" 
+                                   value="{{ bike.year }}" min="1900" max="{{ current_year }}" required>
                         </div>
+
+                        <div class="mb-3">
+                            <label for="engine_cc" class="form-label">Engine (CC)</label>
+                            <input type="number" class="form-control" id="engine_cc" name="engine_cc" 
+                                   value="{{ bike.engine_cc }}" min="50" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="km_driven" class="form-label">Kilometers Driven</label>
+                            <input type="number" class="form-control" id="km_driven" name="km_driven" 
+                                   value="{{ bike.km_driven }}" min="0" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="mileage" class="form-label">Mileage (km/l)</label>
+                            <input type="number" step="0.1" class="form-control" id="mileage" name="mileage" 
+                                   value="{{ bike.mileage }}" min="0" required>
+                        </div>
+
                         <div class="mb-3">
                             <label for="condition" class="form-label">Condition</label>
                             <select class="form-select" id="condition" name="condition" required>
@@ -31,6 +53,7 @@
                                 <option value="Poor" {% if bike.condition == 'Poor' %}selected{% endif %}>Poor</option>
                             </select>
                         </div>
+
                         <div class="mb-3">
                             <label for="listing_type" class="form-label">Listing Type</label>
                             <select class="form-select" id="listing_type" name="listing_type" required>
@@ -38,40 +61,45 @@
                                 <option value="sale" {% if bike.listing_type == 'sale' %}selected{% endif %}>For Sale</option>
                             </select>
                         </div>
+
                         <div class="mb-3" id="price_per_day_div" {% if bike.listing_type != 'rent' %}style="display: none;"{% endif %}>
-                            <label for="price_per_day" class="form-label">Price per Day ($)</label>
+                            <label for="price_per_day" class="form-label">Price per Day (₹)</label>
                             <input type="number" step="0.01" min="0" class="form-control" id="price_per_day" name="price_per_day" 
                                    value="{{ '%.2f'|format(bike.price_per_day) if bike.price_per_day else '' }}">
                         </div>
+
                         <div class="mb-3" id="sale_price_div" {% if bike.listing_type != 'sale' %}style="display: none;"{% endif %}>
-                            <label for="sale_price" class="form-label">Sale Price ($)</label>
+                            <label for="sale_price" class="form-label">Sale Price (₹)</label>
                             <input type="number" step="0.01" min="0" class="form-control" id="sale_price" name="sale_price" 
                                    value="{{ '%.2f'|format(bike.sale_price) if bike.sale_price else '' }}">
                         </div>
+
                         <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
                             <textarea class="form-control" id="description" name="description" rows="3" required>{{ bike.description }}</textarea>
                         </div>
+
                         <div class="mb-4">
                             <label class="form-label">Current Images</label>
                             <div class="row">
                                 {% if bike.image_url_1 %}
                                 <div class="col-md-4 mb-3">
-                                    <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_1) }}" class="img-thumbnail" alt="Bike image 1">
+                                    <img src="/static/{{ bike.image_url_1.replace('\\', '/') }}" class="img-thumbnail" alt="Bike image 1">
                                 </div>
                                 {% endif %}
                                 {% if bike.image_url_2 %}
                                 <div class="col-md-4 mb-3">
-                                    <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_2) }}" class="img-thumbnail" alt="Bike image 2">
+                                    <img src="/static/{{ bike.image_url_2.replace('\\', '/') }}" class="img-thumbnail" alt="Bike image 2">
                                 </div>
                                 {% endif %}
                                 {% if bike.image_url_3 %}
                                 <div class="col-md-4 mb-3">
-                                    <img src="{{ url_for('static', filename='bike_images/' + bike.image_url_3) }}" class="img-thumbnail" alt="Bike image 3">
+                                    <img src="/static/{{ bike.image_url_3.replace('\\', '/') }}" class="img-thumbnail" alt="Bike image 3">
                                 </div>
                                 {% endif %}
                             </div>
                         </div>
+
                         <div class="mb-4">
                             <label class="form-label">Update Images (optional)</label>
                             <div class="row g-3">
@@ -89,13 +117,16 @@
                                 </div>
                             </div>
                         </div>
+
                         <div class="mb-4">
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="is_available" name="is_available" {% if bike.is_available %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" role="switch" id="is_available" 
+                                       name="is_available" {% if bike.is_available %}checked{% endif %}>
                                 <label class="form-check-label" for="is_available">Make Available</label>
                             </div>
                             <small class="text-muted">Toggle this switch to make your bike available or unavailable for rent/sale.</small>
                         </div>
+
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">Update Bike</button>
                             <a href="{{ url_for('my_bikes') }}" class="btn btn-outline-secondary">Cancel</a>
@@ -122,10 +153,14 @@ document.addEventListener('DOMContentLoaded', function() {
             pricePerDayDiv.style.display = 'block';
             salePriceDiv.style.display = 'none';
             salePriceInput.value = '';
+            pricePerDayInput.required = true;
+            salePriceInput.required = false;
         } else {
             pricePerDayDiv.style.display = 'none';
             salePriceDiv.style.display = 'block';
             pricePerDayInput.value = '';
+            pricePerDayInput.required = false;
+            salePriceInput.required = true;
         }
     }
 
