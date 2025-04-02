@@ -3,22 +3,19 @@
 {% block title %}My Rental Requests{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container py-4">
+    <h2 class="mb-4">My Rental Requests</h2>
+
+    <!-- Nav tabs -->
     <ul class="nav nav-tabs mb-4" id="requestTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="received-tab" data-bs-toggle="tab" data-bs-target="#received" type="button">
-                Received Requests
-                {% if received_requests %}
-                    <span class="badge bg-primary ms-2">{{ received_requests|length }}</span>
-                {% endif %}
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#received" type="button">
+                Requests Received
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="sent-tab" data-bs-toggle="tab" data-bs-target="#sent" type="button">
-                Sent Requests
-                {% if sent_requests %}
-                    <span class="badge bg-primary ms-2">{{ sent_requests|length }}</span>
-                {% endif %}
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sent" type="button">
+                Requests Sent
             </button>
         </li>
     </ul>
@@ -33,6 +30,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Request ID</th>
+                                <th>Bike Image</th>
                                 <th>Bike</th>
                                 <th>Requester</th>
                                 <th>Dates</th>
@@ -46,6 +44,19 @@
                                 <tr>
                                     <td>#{{ request.id }}</td>
                                     <td>
+                                        {% if request.bike.image_url_1 %}
+                                            <img src="../static/{{ request.bike.image_url_1 }}" 
+                                                 class="img-thumbnail" 
+                                                 style="width: 100px; height: 100px; object-fit: cover;"
+                                                 alt="{{ request.bike.name }}">
+                                        {% else %}
+                                            <div class="bg-light d-flex align-items-center justify-content-center" 
+                                                 style="width: 100px; height: 100px;">
+                                                <i class="fas fa-bicycle fa-2x text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
                                         <a href="{{ url_for('view_bike', bike_id=request.bike.id) }}" class="text-decoration-none">
                                             {{ request.bike.name }}
                                         </a>
@@ -58,7 +69,7 @@
                                     <td>
                                         {{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}
                                         <div class="text-muted small">{{ (request.end_date - request.start_date).days }} days</div>
-                                        <div class="text-muted small">Total: ${{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</div>
+                                        <div class="text-muted small">Total: ₹{{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</div>
                                     </td>
                                     <td>
                                         {% if request.message %}
@@ -70,9 +81,9 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge {% if request.status == 'pending' %}badge-warning
-                                                       {% elif request.status == 'approved' %}badge-success
-                                                       {% else %}badge-danger{% endif %}">
+                                        <span class="badge {% if request.status == 'pending' %}bg-warning
+                                                       {% elif request.status == 'approved' %}bg-success
+                                                       {% else %}bg-danger{% endif %}">
                                             {{ request.status.title() }}
                                         </span>
                                     </td>
@@ -109,6 +120,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Request ID</th>
+                                <th>Bike Image</th>
                                 <th>Bike</th>
                                 <th>Owner</th>
                                 <th>Dates</th>
@@ -120,6 +132,19 @@
                             {% for request in sent_requests %}
                                 <tr>
                                     <td>#{{ request.id }}</td>
+                                    <td>
+                                        {% if request.bike.image_url_1 %}
+                                            <img src="../static/{{ request.bike.image_url_1 }}" 
+                                                 class="img-thumbnail" 
+                                                 style="width: 100px; height: 100px; object-fit: cover;"
+                                                 alt="{{ request.bike.name }}">
+                                        {% else %}
+                                            <div class="bg-light d-flex align-items-center justify-content-center" 
+                                                 style="width: 100px; height: 100px;">
+                                                <i class="fas fa-bicycle fa-2x text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         <a href="{{ url_for('view_bike', bike_id=request.bike.id) }}" class="text-decoration-none">
                                             {{ request.bike.name }}
@@ -134,11 +159,11 @@
                                         {{ request.start_date.strftime('%Y-%m-%d') }} to {{ request.end_date.strftime('%Y-%m-%d') }}
                                         <div class="text-muted small">{{ (request.end_date - request.start_date).days }} days</div>
                                     </td>
-                                    <td>${{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</td>
+                                    <td>₹{{ "%.2f"|format(request.bike.price_per_day * (request.end_date - request.start_date).days) }}</td>
                                     <td>
-                                        <span class="badge {% if request.status == 'pending' %}badge-warning
-                                                       {% elif request.status == 'approved' %}badge-success
-                                                       {% else %}badge-danger{% endif %}">
+                                        <span class="badge {% if request.status == 'pending' %}bg-warning
+                                                       {% elif request.status == 'approved' %}bg-success
+                                                       {% else %}bg-danger{% endif %}">
                                             {{ request.status.title() }}
                                         </span>
                                     </td>
@@ -158,6 +183,17 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+<style>
+.img-thumbnail {
+    border-radius: 8px;
+}
+.table td {
+    vertical-align: middle;
+}
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
     // Enable tooltips
@@ -166,7 +202,6 @@
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    // Handle request approval/rejection
     function handleRequest(requestId, action) {
         fetch(`/rental-requests/${requestId}/handle`, {
             method: 'POST',
@@ -177,16 +212,18 @@
         })
         .then(response => response.json())
         .then(data => {
-            if (data.error) {
+            if (data.message) {
+                // Success - reload the page
+                location.reload();
+            } else if (data.error) {
                 alert(data.error);
             } else {
-                alert(data.message);
-                location.reload();  // Reload the page to show updated status
+                alert('Error processing request. Please try again.');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while processing the request');
+            alert('Error processing request. Please try again.');
         });
     }
 </script>

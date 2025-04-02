@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 import os
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
+import joblib
+from sklearn.preprocessing import StandardScaler
 
 # Load environment variables
 load_dotenv()
@@ -650,15 +652,15 @@ def request_purchase(bike_id):
             # Validate bike availability and conditions
             if not bike.is_available:
                 flash('Sorry, this bike is no longer available.', 'error')
-                return render_template('view_bike.html', bike=bike, error='Bike not available')
+                return redirect(url_for('view_bike', bike_id=bike_id))
 
             if bike.owner_id == session['user_id']:
                 flash('You cannot purchase your own bike.', 'error')
-                return render_template('view_bike.html', bike=bike, error='Cannot purchase own bike')
+                return redirect(url_for('view_bike', bike_id=bike_id))
 
             if bike.listing_type != 'sale':
                 flash('This bike is not listed for sale.', 'error')
-                return render_template('view_bike.html', bike=bike, error='Bike not for sale')
+                return redirect(url_for('view_bike', bike_id=bike_id))
 
             # Check for existing pending request
             existing_request = Purchase.query.filter_by(
@@ -669,7 +671,7 @@ def request_purchase(bike_id):
 
             if existing_request:
                 flash('You already have a pending request for this bike.', 'warning')
-                return render_template('view_bike.html', bike=bike, error='Existing request pending')
+                return redirect(url_for('view_bike', bike_id=bike_id))
 
             # Create purchase request
             purchase = Purchase(
@@ -727,15 +729,15 @@ The Bike Rental Team"""
                 print(f"Error sending emails: {str(e)}")
 
             flash('Purchase request sent successfully!', 'success')
-            return render_template('view_bike.html', bike=bike, success=True, purchase=purchase)
+            return redirect(url_for('view_bike', bike_id=bike_id))  # Changed to redirect
 
         except Exception as e:
             db.session.rollback()
             flash(f'Error processing purchase request: {str(e)}', 'error')
-            return render_template('view_bike.html', bike=bike, error=str(e))
+            return redirect(url_for('view_bike', bike_id=bike_id))  # Changed to redirect
 
-    # GET request - show purchase form
-    return render_template('view_bike.html', bike=bike)
+    # GET request - redirect to view_bike
+    return redirect(url_for('view_bike', bike_id=bike_id))
 
 @app.route('/my-purchase-requests')
 @login_required
@@ -875,7 +877,12 @@ def my_rentals():
     owned_bike_ids = [bike[0] for bike in owned_bikes]
     rentals_of_my_bikes = Rental.query.filter(
         Rental.bike_id.in_(owned_bike_ids)
-    ).order_by(Rental.created_at.desc()).all()
+    ).order_by(Rental.created_at.desc()).all() if owned_bike_ids else []
+    
+    # Debug logging
+    print(f"User ID: {session['user_id']}")
+    print(f"My rentals count: {len(my_rentals)}")
+    print(f"Rentals of my bikes count: {len(rentals_of_my_bikes)}")
     
     return render_template('my_rentals.html', 
                          my_rentals=my_rentals,
@@ -927,30 +934,28 @@ def complete_rental(rental_id):
 @app.route('/my-rental-requests')
 @login_required
 def my_rental_requests():
-    user_id = session['user_id']
+    user_id = session.get('user_id')
     
     # Get requests sent by the user
     sent_requests = RentalRequest.query.filter_by(renter_id=user_id).order_by(RentalRequest.created_at.desc()).all()
     
-    # Get bikes owned by the user with their request counts
-    owned_bikes_info = db.session.execute("""
-        SELECT b.id, b.brand, b.model,
-               (SELECT COUNT(*) FROM rental_request WHERE bike_id = b.id) as request_count
-        FROM bike b 
-        WHERE b.owner_id = :user_id
-    """, {'user_id': user_id}).fetchall()
-    
     # Get requests received for user's bikes
-    owned_bike_ids = [bike.id for bike in Bike.query.filter_by(owner_id=user_id).all()]
+    owned_bikes = Bike.query.filter_by(owner_id=user_id).all()
+    owned_bike_ids = [bike.id for bike in owned_bikes]
     
     received_requests = RentalRequest.query.filter(
-        RentalRequest.bike_id.in_(owned_bike_ids) if owned_bike_ids else False
-    ).order_by(RentalRequest.created_at.desc()).all()
+        RentalRequest.bike_id.in_(owned_bike_ids)
+    ).order_by(RentalRequest.created_at.desc()).all() if owned_bike_ids else []
+    
+    # Debug logging
+    print(f"User ID: {user_id}")
+    print(f"Owned Bikes: {owned_bike_ids}")
+    print(f"Sent Requests: {len(sent_requests)}")
+    print(f"Received Requests: {len(received_requests)}")
     
     return render_template('my_rental_requests.html', 
                          sent_requests=sent_requests,
-                         received_requests=received_requests,
-                         owned_bikes_info=owned_bikes_info)
+                         received_requests=received_requests)
 
 @app.route('/rental-requests/<int:request_id>/handle', methods=['POST'])
 @login_required
@@ -970,57 +975,64 @@ def handle_rental_request(request_id):
         
     requester = User.query.get(rental_request.renter_id)
     
-    if action == 'approve':
-        # Calculate rental duration and total price
-        rental_days = (rental_request.end_date - rental_request.start_date).days
-        total_price = rental_days * bike.price_per_day
-        
-        # Create a new rental with status 'active'
-        rental = Rental(
-            bike_id=bike.id,
-            renter_id=rental_request.renter_id,
-            owner_id=bike.owner_id,
-            start_date=rental_request.start_date,
-            end_date=rental_request.end_date,
-            total_price=total_price,
-            status='active'  # Explicitly set status to active
-        )
-        
-        # Update bike and request status
-        bike.is_available = False
-        rental_request.status = 'approved'
-        
-        # Add and commit the rental
-        db.session.add(rental)
-        db.session.commit()
-        
-        print(f"Created rental {rental.id} with status: {rental.status}")
-        
-        if requester.email:
-            send_notification_email(
-                'Your Rental Request was Approved!',
-                requester.email,
-                'email/request_approved.html',
-                user=requester,
-                bike=bike,
-                request=rental_request,
-                rental=rental
+    try:
+        if action == 'approve':
+            # Calculate rental duration and total price
+            rental_days = (rental_request.end_date - rental_request.start_date).days
+            total_price = rental_days * bike.price_per_day
+            
+            # Create a new rental with status 'active'
+            rental = Rental(
+                bike_id=bike.id,
+                renter_id=rental_request.renter_id,
+                owner_id=bike.owner_id,
+                start_date=rental_request.start_date,
+                end_date=rental_request.end_date,
+                total_price=total_price,
+                status='active'  # Explicitly set status to active
             )
-        
-    else:  # reject
-        rental_request.status = 'rejected'
-        if requester.email:
-            send_notification_email(
-                'Update on Your Rental Request',
-                requester.email,
-                'email/request_rejected.html',
-                user=requester,
-                bike=bike,
-                request=rental_request
-            )
-        db.session.commit()
-    
-    return jsonify({'message': f'Request {action}d successfully'})
+            
+            # Update bike and request status
+            bike.is_available = False
+            rental_request.status = 'approved'
+            
+            # Add and commit the rental
+            db.session.add(rental)
+            db.session.commit()
+            
+            if requester.email:
+                send_notification_email(
+                    'Your Rental Request was Approved!',
+                    requester.email,
+                    'email/request_approved.html',
+                    user=requester,
+                    bike=bike,
+                    request=rental_request,
+                    rental=rental
+                )
+            
+            return jsonify({'message': 'Request approved successfully'})
+            
+        else:  # reject
+            rental_request.status = 'rejected'
+            db.session.commit()
+            
+            if requester.email:
+                send_notification_email(
+                    'Update on Your Rental Request',
+                    requester.email,
+                    'email/request_rejected.html',
+                    user=requester,
+                    bike=bike,
+                    request=rental_request
+                )
+            
+            return jsonify({'message': 'Request rejected successfully'})
+            
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error handling rental request: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 def send_purchase_confirmation_email(purchase):
     buyer_email = purchase.buyer_user.email
@@ -1358,6 +1370,71 @@ def test_mail():
             'default_sender': app.config['MAIL_DEFAULT_SENDER']
         }
     })
+
+# Load the trained model and preprocessing objects
+model_artifacts = joblib.load('bike_price_model.joblib')
+rf_model = model_artifacts['model']
+scaler = model_artifacts['scaler']
+label_encoders = model_artifacts['label_encoders']
+
+@app.route('/api/bikes/<int:bike_id>/analyze', methods=['GET'])
+def analyze_bike(bike_id):
+    try:
+        # Get bike from MongoDB using SQL ID
+        bike = bikes_collection.find_one({'sql_id': bike_id})
+        
+        if not bike:
+            return jsonify({
+                'success': False,
+                'message': 'Bike not found'
+            }), 404
+
+        # Prepare input data
+        input_data = {
+            'brand': bike['brand'],
+            'model': bike['model'],
+            'year': int(bike['year']),
+            'engine_cc': int(bike['engine_cc']),
+            'km_driven': int(bike['km_driven']),
+            'mileage': float(bike['mileage']),
+            'condition': bike['condition']
+        }
+
+        # Transform categorical variables
+        brand_encoded = label_encoders['brand'].transform([input_data['brand']])[0]
+        model_encoded = label_encoders['model'].transform([input_data['model']])[0]
+        condition_encoded = label_encoders['condition'].transform([input_data['condition']])[0]
+
+        # Create feature vector
+        X_input = [[
+            brand_encoded,
+            model_encoded,
+            input_data['year'],
+            input_data['engine_cc'],
+            input_data['km_driven'],
+            input_data['mileage'],
+            condition_encoded
+        ]]
+
+        # Scale features
+        X_input_scaled = scaler.transform(X_input)
+
+        # Make prediction
+        estimated_price = rf_model.predict(X_input_scaled)[0]
+
+        return jsonify({
+            'success': True,
+            'estimated_price': float(estimated_price),
+            'actual_price': float(bike['sale_price']),
+            'parameters': input_data
+        }), 200
+
+    except Exception as e:
+        print(f"Analysis error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Analysis error: {str(e)}"
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():

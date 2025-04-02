@@ -12,8 +12,13 @@
                     <div class="carousel-inner">
                         {% if bike.image_url_1 %}
                             <div class="carousel-item active">
-                                <img src="../static/{{ bike.image_url_1 }}" 
-                                     class="d-block w-100 rounded" alt="{{ bike.name }}">
+                                <img src="../static/{{ bike.image_url_1.replace('\\', '/') }}" 
+                                     class="img-fluid rounded" alt="{{ bike.name }}"
+                                     style="max-height: 400px; width: 100%; object-fit: cover;">
+                            </div>
+                        {% else %}
+                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 400px;">
+                                <i class="fas fa-bicycle fa-4x text-muted"></i>
                             </div>
                         {% endif %}
                         {% if bike.image_url_2 %}
@@ -187,6 +192,20 @@
                                 </div>
                             </form>
                             {% else %}
+                            <div class="mb-3">
+                                <button id="analyzeButton" class="btn btn-info mb-3" onclick="analyzeBike()">
+                                    <i class="fas fa-chart-line me-2"></i>Analyze Price
+                                </button>
+                                <div id="analysisResult" class="alert alert-info" style="display: none;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status" id="analysisSpinner" style="display: none;">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span id="analysisText"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <form method="POST" action="{{ url_for('request_purchase', bike_id=bike.id) }}" class="mb-3">
                                 <div class="mb-3">
                                     <label for="message" class="form-label">Message to Owner (Optional)</label>
@@ -230,19 +249,66 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Set minimum date for rental form
-    const today = new Date().toISOString().split('T')[0];
-    const startDate = document.getElementById('start_date');
-    const endDate = document.getElementById('end_date');
+function analyzeBike() {
+    const button = document.getElementById('analyzeButton');
+    const spinner = document.getElementById('analysisSpinner');
+    const result = document.getElementById('analysisResult');
+    const analysisText = document.getElementById('analysisText');
     
-    if (startDate && endDate) {
-        startDate.min = today;
-        startDate.addEventListener('change', function() {
-            endDate.min = this.value;
-        });
-    }
-});
+    // Disable button and show spinner
+    button.disabled = true;
+    spinner.style.display = 'inline-block';
+    result.style.display = 'block';
+    analysisText.textContent = 'Analyzing...';
+
+    fetch(`/api/bikes/{{ bike.id }}/analyze`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            const actualPrice = {{ bike.sale_price }};
+            const estimatedPrice = data.estimated_price;
+            const difference = ((actualPrice - estimatedPrice) / estimatedPrice * 100).toFixed(1);
+            const priceAssessment = difference > 0 ? 'above' : 'below';
+            
+            // Format numbers with Indian currency format
+            const formatPrice = (price) => {
+                return new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    maximumFractionDigits: 0
+                }).format(price);
+            };
+            
+            analysisText.innerHTML = `
+                <strong>AI Price Analysis:</strong><br>
+                Estimated Market Value: ${formatPrice(estimatedPrice)}<br>
+                Current Price: ${formatPrice(actualPrice)}<br>
+                This bike is ${Math.abs(difference)}% ${priceAssessment} estimated market value
+            `;
+        } else {
+            analysisText.textContent = 'Analysis failed: ' + data.message;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        analysisText.textContent = 'Error performing analysis. Please try again. ' + error.message;
+    })
+    .finally(() => {
+        button.disabled = false;
+        spinner.style.display = 'none';
+    });
+}
 </script>
 {% endblock %}
